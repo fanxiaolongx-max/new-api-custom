@@ -5216,6 +5216,23 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Hardware Temperature": "Hardware Temperature",
+    "Live": "Live",
+    "CPU Core": "CPU Core",
+    "Processor": "Processor",
+    "NVMe SSD": "NVMe SSD",
+    "Storage": "Storage",
+    "Motherboard / PCH": "Motherboard / PCH",
+    "Chipset": "Chipset",
+    "Cool": "Cool",
+    "Normal": "Normal",
+    "Warm": "Warm",
+    "Sensors": "Sensors",
+    "Collapse": "Collapse",
+    "Detected Hardware Sensors": "Detected Hardware Sensors",
+    "Temperature Trend": "Temperature Trend",
+    "points": "points",
+    "No temperature history yet. Recording in progress...": "No temperature history yet. Recording in progress..."
   }
 }

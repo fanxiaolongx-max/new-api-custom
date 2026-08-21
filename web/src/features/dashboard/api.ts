@@ -91,3 +91,41 @@ export async function getUptimeStatus() {
   )
   return res.data
 }
+
+// ----------------------------------------------------------------------------
+// System Hardware Temperature Monitoring
+// ----------------------------------------------------------------------------
+
+export interface SensorMetric {
+  name: string
+  label: string
+  temp_c: number
+  category: 'cpu' | 'nvme' | 'pch' | 'other'
+}
+
+export interface TemperaturePoint {
+  timestamp: number
+  time_str: string
+  cpu: number
+  nvme: number
+  pch: number
+}
+
+export interface TemperatureOverview {
+  available: boolean
+  message?: string
+  current: TemperaturePoint
+  sensors: SensorMetric[]
+  history: TemperaturePoint[]
+  updated_time: number
+}
+
+// Get system hardware temperature data and historical curve
+export async function getSystemTemperature() {
+  const res = await api.get<{
+    success: boolean
+    data: TemperatureOverview
+    message?: string
+  }>('/api/system/temperature')
+  return res.data
+}

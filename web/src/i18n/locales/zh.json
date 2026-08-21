@@ -5216,6 +5216,23 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Hardware Temperature": "服务器硬件温度",
+    "Live": "实时",
+    "CPU Core": "CPU 核心",
+    "Processor": "处理器",
+    "NVMe SSD": "NVMe 固态硬盘",
+    "Storage": "存储",
+    "Motherboard / PCH": "主板芯片 / PCH",
+    "Chipset": "主板芯片",
+    "Cool": "清凉",
+    "Normal": "正常",
+    "Warm": "升温",
+    "Sensors": "传感器",
+    "Collapse": "收起",
+    "Detected Hardware Sensors": "已检测到的硬件传感器",
+    "Temperature Trend": "温度变化走势",
+    "points": "个数据点",
+    "No temperature history yet. Recording in progress...": "暂无历史温度数据，正在周期采集中..."
   }
 }

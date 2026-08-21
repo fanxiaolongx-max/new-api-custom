@@ -125,6 +125,9 @@ func main() {
 	// all currently alive nodes in multi-instance deployments.
 	service.StartSystemInstanceReporter()
 
+	// Start periodic system hardware temperature monitor (CPU/NVMe/PCH)
+	service.StartSystemTemperatureMonitor()
+
 	// Wire task polling adaptor factory (breaks service -> relay import cycle).
 	// Must run before the system task runner starts: the async_task_poll handler
 	// calls service.RunTaskPollingOnce, which needs this factory set.
