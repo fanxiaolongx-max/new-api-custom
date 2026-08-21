@@ -594,6 +594,30 @@ func RevokeUserSession(userID int, sid, reason string) (bool, error) {
 	return revoked, nil
 }
 
+// ValidateUserSessionRefreshHash verifies possession of the current refresh
+// secret without rotating it. The immediately previous digest is accepted
+// only inside the normal refresh race window.
+func ValidateUserSessionRefreshHash(sid, presentedHash string) (*UserSession, error) {
+	if sid == "" || presentedHash == "" {
+		return nil, ErrUserSessionInvalid
+	}
+	now := time.Now().Unix()
+	var session UserSession
+	if err := DB.Where("sid = ?", sid).First(&session).Error; err != nil {
+		return nil, err
+	}
+	if session.Status != UserSessionStatusActive || session.RevokedAt != 0 || session.ExpiresAt <= now {
+		return nil, ErrUserSessionInactive
+	}
+	validCurrent := hmac.Equal([]byte(session.RefreshHash), []byte(presentedHash))
+	validPrevious := session.PreviousRefreshHash != "" && now <= session.PreviousValidUntil &&
+		hmac.Equal([]byte(session.PreviousRefreshHash), []byte(presentedHash))
+	if !validCurrent && !validPrevious {
+		return nil, ErrUserSessionRefreshInvalid
+	}
+	return &session, nil
+}
+
 // RevokeUserSessionByRefreshHash is used when logout is authenticated only by
 // the HttpOnly refresh cookie. Possession of a SID alone is insufficient. The
 // immediately previous digest is accepted only inside the refresh race window.

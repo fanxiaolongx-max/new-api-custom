@@ -111,7 +111,14 @@ func SubscriptionRequestStripePay(c *gin.Context) {
 
 func genStripeSubscriptionLink(referenceId string, customerId string, email string, priceId string) (string, error) {
 	stripe.Key = setting.StripeApiSecret
+	result, err := session.New(newStripeSubscriptionSessionParams(referenceId, customerId, email, priceId))
+	if err != nil {
+		return "", err
+	}
+	return result.URL, nil
+}
 
+func newStripeSubscriptionSessionParams(referenceId string, customerId string, email string, priceId string) *stripe.CheckoutSessionParams {
 	params := &stripe.CheckoutSessionParams{
 		ClientReferenceID: stripe.String(referenceId),
 		SuccessURL:        stripe.String(paymentReturnPath("/wallet")),
@@ -129,14 +136,9 @@ func genStripeSubscriptionLink(referenceId string, customerId string, email stri
 		if "" != email {
 			params.CustomerEmail = stripe.String(email)
 		}
-		params.CustomerCreation = stripe.String(string(stripe.CheckoutSessionCustomerCreationAlways))
 	} else {
 		params.Customer = stripe.String(customerId)
 	}
 
-	result, err := session.New(params)
-	if err != nil {
-		return "", err
-	}
-	return result.URL, nil
+	return params
 }
