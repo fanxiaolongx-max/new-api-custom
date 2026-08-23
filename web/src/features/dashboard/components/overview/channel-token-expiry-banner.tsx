@@ -60,8 +60,14 @@ export function ChannelTokenExpiryBanner() {
   })
 
   const monitoredChannels = useMemo<MonitoredChannel[]>(() => {
-    if (!channelsRes?.data) return []
-    const channels: Channel[] = channelsRes.data
+    const rawData = channelsRes?.data
+    const channels: Channel[] = Array.isArray(rawData)
+      ? rawData
+      : Array.isArray((rawData as any)?.items)
+        ? (rawData as any).items
+        : []
+
+    if (channels.length === 0) return []
 
     const list: MonitoredChannel[] = []
     for (const ch of channels) {
