@@ -156,12 +156,33 @@ export function stripCustomTags(input: unknown): string {
     .replaceAll(/<\/?think\b[^>]*>/gi, '')
 }
 
-export function getMarkdownContent(children: ReactNode): string {
-  if (Array.isArray(children)) {
-    return normalizeMarkdownExampleFences(stripCustomTags(children.join('')))
-  }
+export function normalizeImageMarkdown(text: string): string {
+  if (!text || typeof text !== 'string') return ''
 
-  return normalizeMarkdownExampleFences(stripCustomTags(children))
+  // 1. Fix ![alt]\n(data:image/...) or ![alt]\n(http...) where newline is between ] and (
+  let res = text.replace(
+    /!\[([^\]]*)\]\s*\n+\s*\((data:image\/[a-zA-Z0-9+/=;,-]+|https?:\/\/[^\s)]+)\)/g,
+    '![$1]($2)'
+  )
+
+  // 2. Fix standalone raw (data:image/...;base64,...) -> ![image](data:image/...)
+  res = res.replace(
+    /(?<![!\[])\((data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]+)\)/g,
+    '\n\n![image]($1)\n\n'
+  )
+
+  // 3. Fix standalone raw data:image/...;base64,... that is not enclosed in markdown
+  res = res.replace(
+    /(?<!\()(?<!\[)(data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]{100,})/g,
+    '\n\n![image]($1)\n\n'
+  )
+
+  return res
+}
+
+export function getMarkdownContent(children: ReactNode): string {
+  const rawText = Array.isArray(children) ? children.join('') : String(children ?? '')
+  return normalizeImageMarkdown(normalizeMarkdownExampleFences(stripCustomTags(rawText)))
 }
 
 export function getNodeKey(node: ParsedNode, index: number): string {

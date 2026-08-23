@@ -37,7 +37,7 @@ import { renderChildren, renderFootnotes } from './response-renderer'
 import type { ResponseProps } from './response-types'
 
 const DEFAULT_PARSER_ID = 'new-api-response'
-const MAX_PARSED_MARKDOWN_CHARS = 20_000
+const MAX_PARSED_MARKDOWN_CHARS = 2_000_000
 type MarkdownInstance = ReturnType<typeof getMarkdown>
 
 const markdownByParserId = new Map<string, MarkdownInstance>()
@@ -71,7 +71,19 @@ export const Response = memo((props: ResponseProps) => {
 
     return parseMarkdownToStructure(content, markdown, {
       final: isFinal,
-      validateLink: markdown.options.validateLink,
+      validateLink: (url) => {
+        if (
+          typeof url === 'string' &&
+          (url.startsWith('data:image/') ||
+            url.startsWith('http://') ||
+            url.startsWith('https://'))
+        ) {
+          return true
+        }
+        return markdown.options.validateLink
+          ? markdown.options.validateLink(url)
+          : true
+      },
     })
   }, [content, isFinal, markdown, shouldParseMarkdown])
   const parsedContent = useMemo(() => parseResponseContent(nodes), [nodes])
