@@ -219,28 +219,19 @@ export function MultiModelBar({
           {/* Add Model Dropdown */}
           {compareModels.length < 4 && (
             <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          disabled={disabled}
-                          size='sm'
-                          variant='outline'
-                          className='h-7 gap-1 rounded-full border-dashed px-2.5 text-xs font-medium'
-                        />
-                      }
-                    >
-                      <PlusIcon size={12} />
-                      <span>{t('Add model')}</span>
-                    </DropdownMenuTrigger>
-                  }
-                />
-                <TooltipContent>
-                  <p>{t('Add up to 4 models to compare side-by-side')}</p>
-                </TooltipContent>
-              </Tooltip>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    disabled={disabled}
+                    size='sm'
+                    variant='outline'
+                    className='h-7 gap-1 rounded-full border-dashed px-2.5 text-xs font-medium'
+                  />
+                }
+              >
+                <PlusIcon size={12} />
+                <span>{t('Add model')}</span>
+              </DropdownMenuTrigger>
 
               <DropdownMenuContent align='end' className='max-h-72 w-56 overflow-y-auto'>
                 <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>

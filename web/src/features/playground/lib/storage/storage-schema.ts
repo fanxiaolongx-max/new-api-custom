@@ -24,26 +24,33 @@ export const MAX_STORED_MESSAGES_BYTES = 1024 * 1024
 export const MAX_LOADED_MESSAGES_CHARS = 120_000
 export const MAX_LOADED_MESSAGE_CHARS = 40_000
 
-export const playgroundConfigSchema = z.object({
-  model: z.string().optional(),
-  group: z.string().optional(),
-  temperature: z.number().optional(),
-  top_p: z.number().optional(),
-  max_tokens: z.number().optional(),
-  frequency_penalty: z.number().optional(),
-  presence_penalty: z.number().optional(),
-  seed: z.number().nullable().optional(),
-  stream: z.boolean().optional(),
-})
+export const playgroundConfigSchema = z
+  .object({
+    model: z.string().optional(),
+    group: z.string().optional(),
+    temperature: z.number().optional(),
+    top_p: z.number().optional(),
+    max_tokens: z.number().optional(),
+    frequency_penalty: z.number().optional(),
+    presence_penalty: z.number().optional(),
+    seed: z.number().nullable().optional(),
+    stream: z.boolean().optional(),
+    webSearch: z.boolean().optional(),
+    mode: z.enum(['single', 'compare']).optional(),
+    compareModels: z.array(z.string()).optional(),
+  })
+  .passthrough()
 
-export const parameterEnabledSchema = z.object({
-  temperature: z.boolean().optional(),
-  top_p: z.boolean().optional(),
-  max_tokens: z.boolean().optional(),
-  frequency_penalty: z.boolean().optional(),
-  presence_penalty: z.boolean().optional(),
-  seed: z.boolean().optional(),
-})
+export const parameterEnabledSchema = z
+  .object({
+    temperature: z.boolean().optional(),
+    top_p: z.boolean().optional(),
+    max_tokens: z.boolean().optional(),
+    frequency_penalty: z.boolean().optional(),
+    presence_penalty: z.boolean().optional(),
+    seed: z.boolean().optional(),
+  })
+  .passthrough()
 
 const messageRoleSchema = z.enum(['user', 'assistant', 'system'])
 const messageStatusSchema = z.enum([
@@ -53,39 +60,67 @@ const messageStatusSchema = z.enum([
   'error',
 ])
 
-const messageVersionSchema = z.object({
-  id: z.string(),
-  content: z.string(),
-})
+const messageVersionSchema = z
+  .object({
+    id: z.string(),
+    content: z.string(),
+  })
+  .passthrough()
 
-const sourceSchema = z.object({
-  href: z.string(),
-  title: z.string(),
-})
+const sourceSchema = z
+  .object({
+    href: z.string(),
+    title: z.string(),
+  })
+  .passthrough()
 
-const reasoningSchema = z.object({
-  content: z.string(),
-  duration: z.number(),
-  startedAt: z.number().optional(),
-  completedAt: z.number().optional(),
-  durationMs: z.number().optional(),
-})
+const reasoningSchema = z
+  .object({
+    content: z.string(),
+    duration: z.number(),
+    startedAt: z.number().optional(),
+    completedAt: z.number().optional(),
+    durationMs: z.number().optional(),
+  })
+  .passthrough()
 
-const messageSchema = z.object({
-  key: z.string(),
-  from: messageRoleSchema,
-  versions: z.array(messageVersionSchema).min(1),
-  createdAt: z.number().optional(),
-  startedAt: z.number().optional(),
-  completedAt: z.number().optional(),
-  durationMs: z.number().optional(),
-  sources: z.array(sourceSchema).optional(),
-  reasoning: reasoningSchema.optional(),
-  isReasoningStreaming: z.boolean().optional(),
-  isReasoningComplete: z.boolean().optional(),
-  isContentComplete: z.boolean().optional(),
-  status: messageStatusSchema.optional(),
-  errorCode: z.string().nullable().optional(),
-})
+const modelCompareResponseSchema = z
+  .object({
+    model: z.string(),
+    content: z.string(),
+    reasoning: reasoningSchema.optional(),
+    isReasoningStreaming: z.boolean().optional(),
+    isReasoningComplete: z.boolean().optional(),
+    isContentComplete: z.boolean().optional(),
+    status: messageStatusSchema.optional(),
+    errorCode: z.string().nullable().optional(),
+    sources: z.array(sourceSchema).optional(),
+    startedAt: z.number().optional(),
+    completedAt: z.number().optional(),
+    durationMs: z.number().optional(),
+  })
+  .passthrough()
+
+const messageSchema = z
+  .object({
+    key: z.string(),
+    from: messageRoleSchema,
+    versions: z.array(messageVersionSchema).min(1),
+    createdAt: z.number().optional(),
+    startedAt: z.number().optional(),
+    completedAt: z.number().optional(),
+    durationMs: z.number().optional(),
+    sources: z.array(sourceSchema).optional(),
+    reasoning: reasoningSchema.optional(),
+    isReasoningStreaming: z.boolean().optional(),
+    isReasoningComplete: z.boolean().optional(),
+    isContentComplete: z.boolean().optional(),
+    status: messageStatusSchema.optional(),
+    errorCode: z.string().nullable().optional(),
+    files: z.array(z.any()).optional(),
+    model: z.string().optional(),
+    multiResponses: z.array(modelCompareResponseSchema).optional(),
+  })
+  .passthrough()
 
 export const messagesSchema = z.array(messageSchema)
