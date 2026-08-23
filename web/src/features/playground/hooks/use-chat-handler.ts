@@ -358,6 +358,15 @@ export function useChatHandler({
             activeStreamsCount -= 1
             const durationMs = Date.now() - startTime
 
+            const isReallyError =
+              status === 'error' ||
+              (!accumulatedContent.trim() && !accumulatedReasoning.trim())
+            const finalError =
+              errText ||
+              (isReallyError
+                ? t('No response received (check channel status or model availability)')
+                : null)
+
             onMessageUpdate((prev) => {
               if (generation !== requestGenerationRef.current) return prev
               return updateLastAssistantMessage(prev, (msg) => {
@@ -366,11 +375,10 @@ export function useChatHandler({
                   if (r.model !== modelName) return r
                   return {
                     ...r,
-                    status:
-                      status === 'complete'
-                        ? MESSAGE_STATUS.COMPLETE
-                        : MESSAGE_STATUS.ERROR,
-                    errorCode: errText || null,
+                    status: isReallyError
+                      ? MESSAGE_STATUS.ERROR
+                      : MESSAGE_STATUS.COMPLETE,
+                    errorCode: finalError,
                     durationMs,
                     completedAt: Date.now(),
                   }
@@ -402,8 +410,18 @@ export function useChatHandler({
           })
 
           sse.addEventListener('error', (event: any) => {
-            const errDetails = parseStreamErrorDetails(event.data)
-            handleFinish('error', errDetails.errorMessage)
+            let errorMsg = ''
+            try {
+              const errDetails = parseStreamErrorDetails(event.data)
+              errorMsg = errDetails.errorMessage || ''
+            } catch {
+              // ignore
+            }
+            handleFinish(
+              'error',
+              errorMsg ||
+                t('Model Request Failed (HTTP 503 or channel unavailable)')
+            )
           })
 
           sse.stream()

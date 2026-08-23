@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -234,22 +235,24 @@ export function MultiModelBar({
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align='end' className='max-h-72 w-56 overflow-y-auto'>
-                <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
-                  {t('Select model to add')}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {models
-                  .filter((m) => !compareModels.includes(m.value))
-                  .map((m) => (
-                    <DropdownMenuItem
-                      key={m.value}
-                      onClick={() => handleAddModel(m.value)}
-                      className='text-xs font-mono'
-                    >
-                      <BotIcon className='mr-2 size-3.5' />
-                      <span className='truncate'>{m.label || m.value}</span>
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
+                    {t('Select model to add')}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {models
+                    .filter((m) => !compareModels.includes(m.value))
+                    .map((m) => (
+                      <DropdownMenuItem
+                        key={m.value}
+                        onClick={() => handleAddModel(m.value)}
+                        className='text-xs font-mono'
+                      >
+                        <BotIcon className='mr-2 size-3.5' />
+                        <span className='truncate'>{m.label || m.value}</span>
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -270,40 +273,42 @@ export function MultiModelBar({
               <span className='hidden sm:inline'>{t('Presets')}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' className='w-48'>
-              <DropdownMenuLabel className='text-xs'>
-                {t('Comparison Presets')}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() =>
-                  handleApplyPreset(['gpt-4o', 'gemini-3.1-pro'])
-                }
-              >
-                GPT-4o vs Gemini 3.1
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  handleApplyPreset([
-                    'gpt-4o',
-                    'gemini-3.1-pro',
-                    'claude-3-5-sonnet',
-                  ])
-                }
-              >
-                {t('Top 3 Flagship Models')}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  handleApplyPreset([
-                    'gpt-4o',
-                    'gemini-3.1-pro',
-                    'claude-3-5-sonnet',
-                    'deepseek-r1',
-                  ])
-                }
-              >
-                {t('All-Stars Arena (4 Models)')}
-              </DropdownMenuItem>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className='text-xs'>
+                  {t('Comparison Presets')}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    handleApplyPreset(['gpt-4o', 'gemini-3.1-pro'])
+                  }
+                >
+                  GPT-4o vs Gemini 3.1
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    handleApplyPreset([
+                      'gpt-4o',
+                      'gemini-3.1-pro',
+                      'claude-3-5-sonnet',
+                    ])
+                  }
+                >
+                  {t('Top 3 Flagship Models')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    handleApplyPreset([
+                      'gpt-4o',
+                      'gemini-3.1-pro',
+                      'claude-3-5-sonnet',
+                      'deepseek-r1',
+                    ])
+                  }
+                >
+                  {t('All-Stars Arena (4 Models)')}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
