@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { FileIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -91,6 +92,38 @@ export function PlaygroundMessageContent({
         getMessageAlignmentClass(alignment)
       )}
     >
+      {message.files && message.files.length > 0 && (
+        <div className='flex flex-wrap gap-2 mb-2'>
+          {message.files.map((file, index) => {
+            const isImage =
+              file.mediaType?.startsWith('image/') ||
+              file.url?.startsWith('data:image/')
+            return isImage ? (
+              <div
+                key={file.url || index}
+                className='relative max-h-60 max-w-xs overflow-hidden rounded-lg border border-border/70 bg-muted/20 shadow-xs'
+              >
+                <img
+                  alt={file.filename || 'uploaded image'}
+                  className='max-h-60 max-w-xs object-cover'
+                  src={file.url}
+                />
+              </div>
+            ) : (
+              <div
+                key={file.filename || index}
+                className='flex items-center gap-1.5 rounded-md border border-border/70 bg-muted/40 px-2.5 py-1.5 text-xs font-medium text-foreground'
+              >
+                <FileIcon className='size-3.5 text-muted-foreground' />
+                <span className='truncate max-w-[200px]'>
+                  {file.filename || 'file'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {hasSources && (
         <Sources>
           <SourcesTrigger count={sources.length} />

@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { FileUIPart } from 'ai'
+
 import type { GroupOption, ModelOption } from '../../types'
 
 type InputControlStateOptions = {
@@ -26,6 +28,7 @@ type InputControlStateOptions = {
   isModelLoading?: boolean
   models: ModelOption[]
   text: string
+  hasFiles?: boolean
 }
 
 type InputControlState = {
@@ -36,17 +39,26 @@ type InputControlState = {
 
 type SubmittableInputMessage = {
   text?: string | null
+  files?: FileUIPart[]
 }
 
 export function getSubmittableInputText(
   message: SubmittableInputMessage,
   disabled?: boolean
 ): string | null {
-  if (disabled || !message.text?.trim()) {
+  if (disabled) {
     return null
   }
 
-  return message.text
+  if (message.text?.trim()) {
+    return message.text
+  }
+
+  if (message.files && message.files.length > 0) {
+    return ''
+  }
+
+  return null
 }
 
 export function getInputControlState({
@@ -57,11 +69,13 @@ export function getInputControlState({
   isModelLoading,
   models,
   text,
+  hasFiles = false,
 }: InputControlStateOptions): InputControlState {
   const hasModels = models.length > 0
+  const hasContent = text.trim().length > 0 || hasFiles
 
   return {
-    canSubmit: !disabled && hasModels && text.trim().length > 0,
+    canSubmit: !disabled && hasModels && hasContent,
     isSelectorDisabled: disabled || isModelLoading || groups.length === 0,
     shouldShowStop: Boolean(isGenerating && hasStopHandler),
   }

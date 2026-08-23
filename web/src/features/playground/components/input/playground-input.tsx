@@ -16,12 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { FileUIPart } from 'ai'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
   PromptInput,
+  PromptInputAttachment,
+  PromptInputAttachments,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputTextarea,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
@@ -38,7 +42,7 @@ import { PlaygroundInputTools } from './playground-input-tools'
 
 interface PlaygroundInputProps {
   config: PlaygroundConfig
-  onSubmit: (text: string) => void
+  onSubmit: (text: string, files?: FileUIPart[]) => void
   onStop?: () => void
   disabled?: boolean
   isGenerating?: boolean
@@ -87,18 +91,34 @@ export function PlaygroundInput({
   const handleSubmit = (message: PromptInputMessage) => {
     const submittableText = getSubmittableInputText(message, disabled)
 
-    if (!submittableText) return
-    onSubmit(submittableText)
+    if (
+      submittableText === null &&
+      (!message.files || message.files.length === 0)
+    ) {
+      return
+    }
+
+    onSubmit(submittableText ?? '', message.files)
     setText('')
   }
 
   return (
     <div className='grid shrink-0 gap-4 px-1 md:pb-4'>
       <PromptInput
+        accept='*/*'
         className='relative'
         groupClassName='bg-background/95 dark:bg-background/80 border-border/70 shadow-[0_18px_60px_-32px_rgba(0,0,0,0.65)] ring-1 ring-foreground/5 rounded-xl overflow-hidden transition-all duration-200 focus-within:border-primary/45 focus-within:ring-primary/15 focus-within:shadow-[0_22px_70px_-34px_rgba(0,0,0,0.75)]'
+        multiple
         onSubmit={handleSubmit}
       >
+        <PromptInputHeader className='px-4 pt-3 pb-0'>
+          <PromptInputAttachments>
+            {(attachment) => (
+              <PromptInputAttachment data={attachment} key={attachment.id} />
+            )}
+          </PromptInputAttachments>
+        </PromptInputHeader>
+
         <PromptInputTextarea
           autoComplete='off'
           autoCorrect='off'

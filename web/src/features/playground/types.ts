@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { FileUIPart } from 'ai'
+
 // Message types
 export type MessageRole = 'user' | 'assistant' | 'system'
 
@@ -36,6 +38,7 @@ export interface Message {
   startedAt?: number
   completedAt?: number
   durationMs?: number
+  files?: FileUIPart[]
   sources?: { href: string; title: string }[]
   reasoning?: {
     content: string
@@ -76,6 +79,8 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number
   presence_penalty?: number
   seed?: number
+  tools?: Array<{ type: string; [key: string]: any }>
+  web_search?: boolean
 }
 
 export interface ChatCompletionChunk {
@@ -126,6 +131,7 @@ export interface PlaygroundConfig {
   presence_penalty: number
   seed: number | null
   stream: boolean
+  webSearch?: boolean
 }
 
 export interface ParameterEnabled {

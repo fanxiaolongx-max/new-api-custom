@@ -26,6 +26,8 @@ import {
 } from '../lib'
 import type { Message } from '../types'
 
+import type { FileUIPart } from 'ai'
+
 type UsePlaygroundConversationOptions = {
   messages: Message[]
   updateMessages: (
@@ -44,8 +46,8 @@ export function usePlaygroundConversation({
   )
 
   const handleSendMessage = useCallback(
-    (text: string) => {
-      const nextMessages = appendUserMessagePair(messages, text)
+    (text: string, files?: FileUIPart[]) => {
+      const nextMessages = appendUserMessagePair(messages, text, files)
       updateMessages(nextMessages)
       sendChat(nextMessages)
     },

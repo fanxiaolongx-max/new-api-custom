@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { FileUIPart } from 'ai'
 import { nanoid } from 'nanoid'
 
 import { MESSAGE_ROLES, MESSAGE_STATUS } from '../../constants'
@@ -76,13 +77,15 @@ export function updateCurrentVersionContent(
  */
 export function createUserMessage(
   content: string,
-  createdAt: number = Date.now()
+  createdAt: number = Date.now(),
+  files?: FileUIPart[]
 ): Message {
   return {
     key: nanoid(),
     from: MESSAGE_ROLES.USER,
     versions: [createMessageVersion(content)],
     createdAt,
+    files,
   }
 }
 
@@ -154,6 +157,39 @@ export function getTextContent(content: string | ContentPart[]): string {
  */
 export function formatMessageForAPI(message: Message): ChatCompletionMessage {
   const currentVersion = getCurrentVersion(message)
+
+  if (message.files && message.files.length > 0) {
+    const parts: ContentPart[] = []
+
+    if (currentVersion.content) {
+      parts.push({
+        type: 'text',
+        text: currentVersion.content,
+      })
+    }
+
+    for (const file of message.files) {
+      if (
+        file.mediaType?.startsWith('image/') ||
+        file.url?.startsWith('data:image/')
+      ) {
+        parts.push({
+          type: 'image_url',
+          image_url: {
+            url: file.url,
+          },
+        })
+      }
+    }
+
+    if (parts.length > 0) {
+      return {
+        role: message.from,
+        content: parts,
+      }
+    }
+  }
+
   return {
     role: message.from,
     content: currentVersion.content,
@@ -170,6 +206,14 @@ export function isValidMessage(message: Message): boolean {
   // Exclude empty assistant messages (loading/streaming placeholders)
   if (message.from === MESSAGE_ROLES.ASSISTANT && !hasMessageContent(message)) {
     return false
+  }
+
+  // User message is valid if it has text OR has files
+  if (message.from === MESSAGE_ROLES.USER) {
+    return (
+      hasMessageContent(message) ||
+      Boolean(message.files && message.files.length > 0)
+    )
   }
 
   return true

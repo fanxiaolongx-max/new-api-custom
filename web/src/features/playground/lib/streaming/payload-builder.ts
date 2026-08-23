@@ -68,5 +68,10 @@ export function buildChatCompletionPayload(
     payload.seed = config.seed
   }
 
+  if (config.webSearch) {
+    payload.tools = [{ type: 'web_search' }, { type: 'web_search_preview' }]
+    payload.web_search = true
+  }
+
   return payload
 }

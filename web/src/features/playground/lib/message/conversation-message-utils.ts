@@ -54,15 +54,18 @@ type ChatMessageRenderState = {
   isEditing: boolean
 }
 
+import type { FileUIPart } from 'ai'
+
 export function appendUserMessagePair(
   messages: Message[],
-  content: string
+  content: string,
+  files?: FileUIPart[]
 ): Message[] {
   const submittedAt = Date.now()
 
   return [
     ...messages,
-    createUserMessage(content, submittedAt),
+    createUserMessage(content, submittedAt, files),
     createLoadingAssistantMessage(submittedAt),
   ]
 }
