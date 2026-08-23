@@ -33,11 +33,13 @@ import {
   Trash2,
   RefreshCw,
   Loader2,
+  Zap,
 } from 'lucide-react'
 import { useContext, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { QuickTokenUpdateDialog } from './dialogs/quick-token-update-dialog'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -85,6 +87,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const queryClient = useQueryClient()
   const currentUser = useAuthStore((s) => s.auth.user)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [quickTokenOpen, setQuickTokenOpen] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [isTogglingStatus, setIsTogglingStatus] = useState(false)
 
@@ -362,6 +365,17 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
             </DropdownMenuItem>
           )}
 
+          {/* Quick Update Token */}
+          <DropdownMenuItem
+            disabled={!canEditSensitive}
+            onClick={canEditSensitive ? () => setQuickTokenOpen(true) : undefined}
+          >
+            {t('Quick Update Token')}
+            <DropdownMenuShortcut>
+              <Zap size={16} className='text-amber-500' />
+            </DropdownMenuShortcut>
+          </DropdownMenuItem>
+
           <DropdownMenuSeparator />
 
           {/* Delete */}
@@ -396,6 +410,15 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           if (!canEditSensitive) return
           handleDeleteChannel(channel.id, queryClient)
           setDeleteConfirmOpen(false)
+        }}
+      />
+
+      <QuickTokenUpdateDialog
+        open={quickTokenOpen}
+        onOpenChange={setQuickTokenOpen}
+        channel={channel}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: channelsQueryKeys.lists() })
         }}
       />
     </div>
