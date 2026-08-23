@@ -36,17 +36,21 @@ import {
 } from '../../lib'
 import type {
   Message as MessageType,
+  PlaygroundConfig,
   PlaygroundMessageLayoutMode,
+  PlaygroundMode,
 } from '../../types'
 import { MessageActions } from '../message/message-actions'
 import { MessageErrorActions } from '../message/message-error-actions'
 import { PlaygroundMessageContent } from '../message/playground-message-content'
 import { PlaygroundMessageEditor } from '../message/playground-message-editor'
+import { CompareResponseGrid } from '../compare/compare-response-grid'
 import { PlaygroundEmptyState } from './playground-empty-state'
 
 const MAX_RENDERED_HISTORY_MESSAGES = 24
 
 interface PlaygroundChatProps {
+  config?: PlaygroundConfig
   messages: MessageType[]
   onCopyMessage?: (message: MessageType) => void
   onRegenerateMessage?: (message: MessageType) => void
@@ -60,6 +64,7 @@ interface PlaygroundChatProps {
   onCancelEdit?: (open: boolean) => void
   onSaveEditAndSubmit?: (newContent: string) => void
   messageLayoutMode?: PlaygroundMessageLayoutMode
+  mode?: PlaygroundMode
 }
 
 export function PlaygroundChat({
@@ -76,6 +81,7 @@ export function PlaygroundChat({
   onCancelEdit,
   onSaveEditAndSubmit,
   messageLayoutMode = 'alternating',
+  mode,
 }: PlaygroundChatProps) {
   const { t } = useTranslation()
   const [editText, setEditText] = useState('')
@@ -113,6 +119,14 @@ export function PlaygroundChat({
   }, [editingKey, messages])
 
   let chatContent = visibleMessages.map((message, visibleMessageIndex) => {
+    if (message.multiResponses && message.multiResponses.length > 0) {
+      return (
+        <div key={message.key} className='w-full my-2'>
+          <CompareResponseGrid message={message} />
+        </div>
+      )
+    }
+
     const messageIndex = visibleMessageOffset + visibleMessageIndex
     const { alwaysShowActions, content, isEditing } = getChatMessageRenderState(
       messages,
@@ -211,11 +225,21 @@ export function PlaygroundChat({
     ]
   }
 
+  const isCompare =
+    mode === 'compare' ||
+    messages.some((m) => m.multiResponses && m.multiResponses.length > 0)
+
   return (
     <Conversation>
-      {/* Remove outer padding; apply padding to inner centered container to align with input */}
       <ConversationContent className='p-0'>
-        <div className='mx-auto w-full max-w-4xl px-4 py-4'>{chatContent}</div>
+        <div
+          className={cn(
+            'mx-auto w-full px-4 py-4 transition-all duration-300',
+            isCompare ? 'max-w-7xl' : 'max-w-4xl'
+          )}
+        >
+          {chatContent}
+        </div>
       </ConversationContent>
       <ConversationScrollButton />
     </Conversation>

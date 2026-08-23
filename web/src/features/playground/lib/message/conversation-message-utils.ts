@@ -55,6 +55,10 @@ type ChatMessageRenderState = {
 }
 
 import type { FileUIPart } from 'ai'
+import { nanoid } from 'nanoid'
+
+import { MESSAGE_STATUS } from '../../constants'
+import { createMessageVersion } from './message-utils'
 
 export function appendUserMessagePair(
   messages: Message[],
@@ -67,6 +71,34 @@ export function appendUserMessagePair(
     ...messages,
     createUserMessage(content, submittedAt, files),
     createLoadingAssistantMessage(submittedAt),
+  ]
+}
+
+export function appendMultiModelUserMessagePair(
+  messages: Message[],
+  content: string,
+  models: string[],
+  files?: FileUIPart[]
+): Message[] {
+  const submittedAt = Date.now()
+
+  return [
+    ...messages,
+    createUserMessage(content, submittedAt, files),
+    {
+      key: nanoid(),
+      from: MESSAGE_ROLES.ASSISTANT,
+      versions: [createMessageVersion('')],
+      createdAt: submittedAt,
+      startedAt: submittedAt,
+      status: MESSAGE_STATUS.LOADING,
+      multiResponses: models.map((m) => ({
+        model: m,
+        content: '',
+        status: MESSAGE_STATUS.LOADING,
+        startedAt: submittedAt,
+      })),
+    },
   ]
 }
 

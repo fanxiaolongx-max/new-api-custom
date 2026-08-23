@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { PlaygroundChat } from './components/chat/playground-chat'
+import { MultiModelBar } from './components/compare/multi-model-bar'
 import { PlaygroundInput } from './components/input/playground-input'
 import {
   useChatHandler,
@@ -56,6 +57,7 @@ export function Playground() {
     applyEdit,
     handleDeleteMessage,
   } = usePlaygroundConversation({
+    config,
     messages,
     updateMessages,
     sendChat,
@@ -76,10 +78,20 @@ export function Playground() {
 
   return (
     <div className='relative flex size-full min-h-0 flex-col overflow-hidden'>
+      {/* Top Arena/Single Mode Switcher & Models Bar */}
+      <MultiModelBar
+        config={config}
+        models={models}
+        onConfigChange={updateConfig}
+        disabled={isGenerating}
+      />
+
       {/* Full-width scroll container: scrolling works even over side whitespace */}
       <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
         <PlaygroundChat
+          config={config}
           messages={messages}
+          mode={config.mode}
           isLoadingMessages={isLoadingMessages}
           onRegenerateMessage={handleRegenerateMessage}
           onEditMessage={handleEditMessage}
@@ -93,8 +105,8 @@ export function Playground() {
         />
       </div>
 
-      {/* Input area: center content and constrain to the same container width */}
-      <div className='mx-auto w-full max-w-4xl'>
+      {/* Input area: center content and constrain to the container width */}
+      <div className={config.mode === 'compare' ? 'mx-auto w-full max-w-5xl' : 'mx-auto w-full max-w-4xl'}>
         <PlaygroundInput
           config={config}
           disabled={isGenerating}

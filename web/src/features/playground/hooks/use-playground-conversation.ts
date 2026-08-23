@@ -19,16 +19,18 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useState } from 'react'
 
 import {
+  appendMultiModelUserMessagePair,
   appendUserMessagePair,
   applyMessageEdit,
   createRegeneratedMessages,
   removeMessageByKey,
 } from '../lib'
-import type { Message } from '../types'
+import type { Message, PlaygroundConfig } from '../types'
 
 import type { FileUIPart } from 'ai'
 
 type UsePlaygroundConversationOptions = {
+  config?: PlaygroundConfig
   messages: Message[]
   updateMessages: (
     updater: Message[] | ((prev: Message[]) => Message[])
@@ -37,6 +39,7 @@ type UsePlaygroundConversationOptions = {
 }
 
 export function usePlaygroundConversation({
+  config,
   messages,
   updateMessages,
   sendChat,
@@ -47,11 +50,20 @@ export function usePlaygroundConversation({
 
   const handleSendMessage = useCallback(
     (text: string, files?: FileUIPart[]) => {
-      const nextMessages = appendUserMessagePair(messages, text, files)
+      const isCompare = config?.mode === 'compare'
+      const compareModels =
+        config?.compareModels && config.compareModels.length > 0
+          ? config.compareModels
+          : [config?.model || 'gpt-4o', 'gemini-3.1-pro']
+
+      const nextMessages = isCompare
+        ? appendMultiModelUserMessagePair(messages, text, compareModels, files)
+        : appendUserMessagePair(messages, text, files)
+
       updateMessages(nextMessages)
       sendChat(nextMessages)
     },
-    [messages, updateMessages, sendChat]
+    [config, messages, updateMessages, sendChat]
   )
 
   const handleRegenerateMessage = useCallback(

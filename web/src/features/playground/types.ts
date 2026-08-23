@@ -30,6 +30,27 @@ export interface MessageVersion {
   content: string
 }
 
+export interface ModelCompareResponse {
+  model: string
+  content: string
+  reasoning?: {
+    content: string
+    duration: number
+    startedAt?: number
+    completedAt?: number
+    durationMs?: number
+  }
+  isReasoningStreaming?: boolean
+  isReasoningComplete?: boolean
+  isContentComplete?: boolean
+  status?: MessageStatus
+  errorCode?: string | null
+  sources?: { href: string; title: string }[]
+  startedAt?: number
+  completedAt?: number
+  durationMs?: number
+}
+
 export interface Message {
   key: string
   from: MessageRole
@@ -52,6 +73,8 @@ export interface Message {
   isContentComplete?: boolean
   status?: MessageStatus
   errorCode?: string | null
+  model?: string
+  multiResponses?: ModelCompareResponse[]
 }
 
 // API payload types
@@ -121,6 +144,8 @@ export interface ChatCompletionResponse {
 }
 
 // Configuration types
+export type PlaygroundMode = 'single' | 'compare'
+
 export interface PlaygroundConfig {
   model: string
   group: string
@@ -132,6 +157,8 @@ export interface PlaygroundConfig {
   seed: number | null
   stream: boolean
   webSearch?: boolean
+  mode?: PlaygroundMode
+  compareModels?: string[]
 }
 
 export interface ParameterEnabled {

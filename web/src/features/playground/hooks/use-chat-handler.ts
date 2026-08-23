@@ -19,9 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { SSE } from 'sse.js'
 
+import { getFreshAuthHeaders } from '@/lib/api'
 import { sendChatCompletion } from '../api'
-import { ERROR_MESSAGES } from '../constants'
+import { API_ENDPOINTS, ERROR_MESSAGES, MESSAGE_STATUS } from '../constants'
 import {
   applyStreamingChunk,
   buildChatCompletionPayload,
@@ -33,6 +35,10 @@ import {
   hasChatCompletionChoice,
   isAssistantMessageFinal,
   isAssistantMessagePending,
+  isStreamClosedReadyState,
+  isStreamDoneMessage,
+  parseStreamErrorDetails,
+  parseStreamMessageUpdates,
 } from '../lib'
 import type { Message, PlaygroundConfig, ParameterEnabled } from '../types'
 import { useStreamRequest } from './use-stream-request'
@@ -75,6 +81,7 @@ export function useChatHandler({
   const { sendStreamRequest, stopStream, isStreaming } = useStreamRequest()
   const [isRequesting, setIsRequesting] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const compareSourcesRef = useRef<Array<{ close: () => void }>>([])
   const requestGenerationRef = useRef(0)
   const pendingStreamChunksRef = useRef<PendingStreamChunks>({
     generation: 0,
@@ -240,6 +247,184 @@ export function useChatHandler({
     [flushStreamUpdates, getDisplayError, onMessageUpdate, t]
   )
 
+  // Send multi-model streaming chat request
+  const sendMultiModelStreamingChat = useCallback(
+    async (messages: Message[]) => {
+      const lastMsg = messages[messages.length - 1]
+      const multiResponses = lastMsg?.multiResponses || []
+      if (multiResponses.length === 0) return
+
+      const generation = requestGenerationRef.current + 1
+      requestGenerationRef.current = generation
+      stopStream()
+      compareSourcesRef.current.forEach((src) => src.close())
+      compareSourcesRef.current = []
+      discardPendingStreamUpdates(generation)
+      setIsRequesting(true)
+
+      let authHeaders: Record<string, string> = {}
+      try {
+        authHeaders = await getFreshAuthHeaders()
+      } catch {
+        toast.error(t('Failed to get authentication headers'))
+        setIsRequesting(false)
+        return
+      }
+
+      let activeStreamsCount = multiResponses.length
+      const startTime = Date.now()
+
+      multiResponses.forEach((item) => {
+        const modelName = item.model
+        const modelConfig = { ...config, model: modelName }
+        const payload = buildChatCompletionPayload(
+          messages,
+          modelConfig,
+          parameterEnabled
+        )
+
+        try {
+          const sse = new SSE(API_ENDPOINTS.CHAT_COMPLETIONS, {
+            headers: authHeaders,
+            payload: JSON.stringify(payload),
+            method: 'POST',
+          })
+
+          compareSourcesRef.current.push(sse)
+
+          let accumulatedReasoning = ''
+          let accumulatedContent = ''
+
+          sse.addEventListener('message', (event: any) => {
+            if (generation !== requestGenerationRef.current) {
+              sse.close()
+              return
+            }
+
+            const data = event.data
+            if (!data || isStreamDoneMessage(data)) {
+              return
+            }
+
+            try {
+              const updates = parseStreamMessageUpdates(data)
+              let hasChange = false
+              updates.forEach((u) => {
+                if (u.type === 'reasoning') {
+                  accumulatedReasoning += u.chunk
+                  hasChange = true
+                } else if (u.type === 'content') {
+                  accumulatedContent += u.chunk
+                  hasChange = true
+                }
+              })
+
+              if (hasChange) {
+                onMessageUpdate((prev) => {
+                  if (generation !== requestGenerationRef.current) return prev
+                  return updateLastAssistantMessage(prev, (msg) => {
+                    if (!msg.multiResponses) return msg
+                    const nextMulti = msg.multiResponses.map((r) => {
+                      if (r.model !== modelName) return r
+                      return {
+                        ...r,
+                        content: accumulatedContent,
+                        reasoning: accumulatedReasoning
+                          ? {
+                              content: accumulatedReasoning,
+                              duration: r.reasoning?.duration || 0,
+                            }
+                          : undefined,
+                        status: MESSAGE_STATUS.STREAMING,
+                        isReasoningStreaming: Boolean(
+                          accumulatedReasoning && !accumulatedContent
+                        ),
+                      }
+                    })
+                    return { ...msg, multiResponses: nextMulti }
+                  })
+                })
+              }
+            } catch {
+              // ignore parse errors
+            }
+          })
+
+          const handleFinish = (
+            status: 'complete' | 'error',
+            errText?: string
+          ) => {
+            sse.close()
+            activeStreamsCount -= 1
+            const durationMs = Date.now() - startTime
+
+            onMessageUpdate((prev) => {
+              if (generation !== requestGenerationRef.current) return prev
+              return updateLastAssistantMessage(prev, (msg) => {
+                if (!msg.multiResponses) return msg
+                const nextMulti = msg.multiResponses.map((r) => {
+                  if (r.model !== modelName) return r
+                  return {
+                    ...r,
+                    status:
+                      status === 'complete'
+                        ? MESSAGE_STATUS.COMPLETE
+                        : MESSAGE_STATUS.ERROR,
+                    errorCode: errText || null,
+                    durationMs,
+                    completedAt: Date.now(),
+                  }
+                })
+                const allFinished = nextMulti.every(
+                  (r) =>
+                    r.status === MESSAGE_STATUS.COMPLETE ||
+                    r.status === MESSAGE_STATUS.ERROR
+                )
+                return {
+                  ...msg,
+                  status: allFinished
+                    ? MESSAGE_STATUS.COMPLETE
+                    : MESSAGE_STATUS.STREAMING,
+                  multiResponses: nextMulti,
+                }
+              })
+            })
+
+            if (activeStreamsCount <= 0) {
+              setIsRequesting(false)
+            }
+          }
+
+          sse.addEventListener('readystatechange', (event: any) => {
+            if (isStreamClosedReadyState(event.readyState)) {
+              handleFinish('complete')
+            }
+          })
+
+          sse.addEventListener('error', (event: any) => {
+            const errDetails = parseStreamErrorDetails(event.data)
+            handleFinish('error', errDetails.errorMessage)
+          })
+
+          sse.stream()
+        } catch {
+          activeStreamsCount -= 1
+          if (activeStreamsCount <= 0) {
+            setIsRequesting(false)
+          }
+        }
+      })
+    },
+    [
+      config,
+      parameterEnabled,
+      stopStream,
+      discardPendingStreamUpdates,
+      onMessageUpdate,
+      t,
+    ]
+  )
+
   // Send streaming chat request
   const sendStreamingChat = useCallback(
     (messages: Message[]) => {
@@ -348,13 +533,27 @@ export function useChatHandler({
   // Send chat request (stream or non-stream based on config)
   const sendChat = useCallback(
     (messages: Message[]) => {
+      const lastMessage = messages[messages.length - 1]
+      if (
+        lastMessage?.multiResponses &&
+        lastMessage.multiResponses.length > 0
+      ) {
+        void sendMultiModelStreamingChat(messages)
+        return
+      }
+
       if (config.stream) {
         sendStreamingChat(messages)
       } else {
         sendNonStreamingChat(messages)
       }
     },
-    [config.stream, sendStreamingChat, sendNonStreamingChat]
+    [
+      config.stream,
+      sendStreamingChat,
+      sendNonStreamingChat,
+      sendMultiModelStreamingChat,
+    ]
   )
 
   // Stop generation
@@ -365,6 +564,8 @@ export function useChatHandler({
     requestGenerationRef.current = idleGeneration
     discardPendingStreamUpdates(idleGeneration)
     stopStream()
+    compareSourcesRef.current.forEach((src) => src.close())
+    compareSourcesRef.current = []
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     setIsRequesting(false)

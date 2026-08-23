@@ -55,6 +55,8 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   seed: null,
   stream: true,
   webSearch: false,
+  mode: 'single',
+  compareModels: ['gpt-4o', 'gemini-3.1-pro'],
 }
 
 export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
