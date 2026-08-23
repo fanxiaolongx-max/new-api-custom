@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { BotIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -121,10 +122,27 @@ export function PlaygroundChat({
 
   let chatContent = visibleMessages.map((message, visibleMessageIndex) => {
     if (message.multiResponses && message.multiResponses.length > 0) {
+      if (isCompare) {
+        return (
+          <div key={message.key} className='w-full my-2'>
+            <CompareResponseGrid message={message} />
+          </div>
+        )
+      }
+
+      // Single model mode: render as standard message bubble with model switcher tabs
+      const responses = message.multiResponses
       return (
-        <div key={message.key} className='w-full my-2'>
-          <CompareResponseGrid message={message} />
-        </div>
+        <SingleCompareMessageBubble
+          key={message.key}
+          message={message}
+          responses={responses}
+          defaultModel={config?.model}
+          onCopyMessage={onCopyMessage}
+          onDeleteMessage={onDeleteMessage}
+          isGenerating={isGenerating}
+          messageLayoutMode={messageLayoutMode}
+        />
       )
     }
 
@@ -226,9 +244,7 @@ export function PlaygroundChat({
     ]
   }
 
-  const isCompare =
-    mode === 'compare' ||
-    messages.some((m) => m.multiResponses && m.multiResponses.length > 0)
+  const isCompare = mode === 'compare'
 
   return (
     <Conversation>
@@ -244,5 +260,103 @@ export function PlaygroundChat({
       </ConversationContent>
       <ConversationScrollButton />
     </Conversation>
+  )
+}
+
+type SingleCompareMessageBubbleProps = {
+  defaultModel?: string
+  isGenerating?: boolean
+  message: MessageType
+  messageLayoutMode: PlaygroundMessageLayoutMode
+  onCopyMessage?: (message: MessageType) => void
+  onDeleteMessage?: (message: MessageType) => void
+  responses: NonNullable<MessageType['multiResponses']>
+}
+
+function SingleCompareMessageBubble({
+  defaultModel,
+  isGenerating,
+  message,
+  messageLayoutMode,
+  onCopyMessage,
+  onDeleteMessage,
+  responses,
+}: SingleCompareMessageBubbleProps) {
+  const { t } = useTranslation()
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (
+      defaultModel &&
+      responses.some(
+        (r) => r.model === defaultModel && (r.content || r.reasoning?.content)
+      )
+    ) {
+      return defaultModel
+    }
+    const withContent = responses.find((r) => r.content || r.reasoning?.content)
+    return withContent ? withContent.model : responses[0]?.model || ''
+  })
+
+  const activeResponse =
+    responses.find((r) => r.model === selectedModel) || responses[0]
+
+  if (!activeResponse) return null
+
+  const syntheticMessage: MessageType = {
+    ...message,
+    versions: [{ id: '1', content: activeResponse.content }],
+    reasoning: activeResponse.reasoning,
+    isReasoningStreaming: activeResponse.isReasoningStreaming,
+    status: activeResponse.status,
+    errorCode: activeResponse.errorCode,
+    sources: activeResponse.sources,
+  }
+
+  const alignment = getMessageAlignment(syntheticMessage, messageLayoutMode)
+
+  return (
+    <Message className='group flex-row-reverse py-2.5' from={message.from}>
+      <div className='w-full min-w-0 flex-1 basis-full'>
+        {/* Model Tabs within Single Mode Bubble */}
+        <div className='flex flex-wrap items-center gap-1.5 mb-2'>
+          <span className='text-[11px] font-medium text-muted-foreground mr-0.5'>
+            {t('Model response')}:
+          </span>
+          {responses.map((r) => {
+            const isSelected = r.model === selectedModel
+            return (
+              <button
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono transition-all',
+                  isSelected
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+                key={r.model}
+                onClick={() => setSelectedModel(r.model)}
+                type='button'
+              >
+                <BotIcon className='size-3' />
+                <span>{r.model}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <PlaygroundMessageContent
+          actions={
+            <MessageActions
+              className='mt-1.5'
+              isGenerating={isGenerating}
+              message={syntheticMessage}
+              onCopy={onCopyMessage}
+              onDelete={onDeleteMessage}
+            />
+          }
+          alignment={alignment}
+          message={syntheticMessage}
+          versionContent={activeResponse.content}
+        />
+      </div>
+    </Message>
   )
 }
