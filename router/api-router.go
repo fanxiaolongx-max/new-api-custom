@@ -66,6 +66,9 @@ func SetApiRouter(router *gin.Engine) {
 		// Universal secure verification routes
 		apiRouter.POST("/verify", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.UniversalVerify)
 
+		// Logs SSO & Auth
+		apiRouter.GET("/logs/auth", middleware.DisableCache(), controller.LogsAuth)
+
 		userRoute := apiRouter.Group("/user")
 		{
 			userRoute.GET("/auth/logs-sso", middleware.DisableCache(), controller.LogsSSOBridge)
