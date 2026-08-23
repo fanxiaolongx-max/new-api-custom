@@ -52,14 +52,21 @@ func LogsSSOBridge(c *gin.Context) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     service.LogsSessionCookieName,
 		Value:    ticket,
-		Path:     "/logs",
+		Path:     "/",
 		MaxAge:   int(service.LogsSessionTTL / time.Second),
 		Expires:  time.Now().Add(service.LogsSessionTTL),
 		HttpOnly: true,
 		Secure:   common.SessionCookieSecure,
 		SameSite: http.SameSiteStrictMode,
 	})
-	c.Redirect(http.StatusFound, "/logs/")
+	targetURI := c.GetHeader("X-Original-URI")
+	if targetURI == "" {
+		targetURI = c.Query("redirect")
+	}
+	if targetURI == "" {
+		targetURI = "/logs/"
+	}
+	c.Redirect(http.StatusFound, targetURI)
 }
 
 func LogsAuth(c *gin.Context) {
