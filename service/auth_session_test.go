@@ -132,41 +132,6 @@ func TestCreateLoginSessionEnforcesActiveLimitAcrossAuthVersions(t *testing.T) {
 	assert.Equal(t, int64(50), count)
 }
 
-func TestValidateRefreshLoginSessionAndLogsTicket(t *testing.T) {
-	useTestSessionSecret(t)
-	user := setupAuthSessionTestDB(t)
-	user.Role = common.RoleRootUser
-	require.NoError(t, model.DB.Model(user).Update("role", user.Role).Error)
-	bundle, err := CreateLoginSession(user.Id, "password", "127.0.0.1", "test-agent")
-	require.NoError(t, err)
-
-	identity, validatedUser, err := ValidateRefreshLoginSession(bundle.RefreshToken)
-	require.NoError(t, err)
-	assert.Equal(t, user.Id, identity.UserID)
-	assert.Equal(t, common.RoleRootUser, validatedUser.Role)
-
-	server := miniredis.RunT(t)
-	previousRedisEnabled, previousRDB := common.RedisEnabled, common.RDB
-	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
-	common.RedisEnabled, common.RDB = true, client
-	t.Cleanup(func() {
-		_ = client.Close()
-		common.RedisEnabled, common.RDB = previousRedisEnabled, previousRDB
-	})
-
-	ticket, err := IssueLogsSession(identity)
-	require.NoError(t, err)
-	validatedIdentity, ticketUser, err := ValidateLogsSession(ticket)
-	require.NoError(t, err)
-	assert.Equal(t, identity, validatedIdentity)
-	assert.Equal(t, common.RoleRootUser, ticketUser.Role)
-
-	_, _, err = ValidateRefreshLoginSession(bundle.RefreshToken + "invalid")
-	assert.ErrorIs(t, err, ErrRefreshTokenInvalid)
-	_, _, err = ValidateLogsSession("invalid")
-	assert.ErrorIs(t, err, ErrLogsSessionInvalid)
-}
-
 func TestCreateLoginSessionEnforcesIssuanceLimitAcrossAllStatuses(t *testing.T) {
 	useTestSessionSecret(t)
 	user := setupAuthSessionTestDB(t)

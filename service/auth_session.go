@@ -24,6 +24,37 @@ var (
 	ErrRefreshRace          = errors.New("refresh token was already rotated")
 )
 
+// ValidateRefreshLoginSession authenticates a browser refresh cookie without
+// rotating it. It is intended for same-origin bridges that cannot attach the
+// dashboard Authorization header during a top-level navigation.
+func ValidateRefreshLoginSession(rawRefreshToken string) (AuthIdentity, *model.UserBase, error) {
+	sid, secret, ok := splitRefreshToken(rawRefreshToken)
+	if !ok {
+		return AuthIdentity{}, nil, ErrRefreshTokenInvalid
+	}
+	session, err := model.ValidateUserSessionRefreshHash(sid, hashRefreshSecret(secret))
+	if err != nil {
+		if errors.Is(err, model.ErrUserSessionInactive) {
+			return AuthIdentity{}, nil, ErrLoginSessionRevoked
+		}
+		if errors.Is(err, model.ErrUserSessionRefreshInvalid) || errors.Is(err, gorm.ErrRecordNotFound) {
+			return AuthIdentity{}, nil, ErrRefreshTokenInvalid
+		}
+		return AuthIdentity{}, nil, err
+	}
+	identity := AuthIdentity{
+		UserID:          session.UserID,
+		SessionID:       session.SID,
+		UserAuthVersion: session.UserAuthVersion,
+		SessionVersion:  session.Version,
+	}
+	_, user, err := ValidateLoginSession(identity)
+	if err != nil {
+		return AuthIdentity{}, nil, err
+	}
+	return identity, user, nil
+}
+
 type LoginSessionView struct {
 	SID          string `json:"sid"`
 	Current      bool   `json:"current"`
@@ -259,37 +290,6 @@ func RefreshLoginSession(rawRefreshToken, expectedSID, ip, userAgent string) (*A
 		return nil, nil, err
 	}
 	return bundle, currentUser, nil
-}
-
-// ValidateRefreshLoginSession authenticates a browser refresh cookie without
-// rotating it. It is intended for same-origin bridges that cannot attach the
-// dashboard Authorization header during a top-level navigation.
-func ValidateRefreshLoginSession(rawRefreshToken string) (AuthIdentity, *model.UserBase, error) {
-	sid, secret, ok := splitRefreshToken(rawRefreshToken)
-	if !ok {
-		return AuthIdentity{}, nil, ErrRefreshTokenInvalid
-	}
-	session, err := model.ValidateUserSessionRefreshHash(sid, hashRefreshSecret(secret))
-	if err != nil {
-		if errors.Is(err, model.ErrUserSessionInactive) {
-			return AuthIdentity{}, nil, ErrLoginSessionRevoked
-		}
-		if errors.Is(err, model.ErrUserSessionRefreshInvalid) || errors.Is(err, gorm.ErrRecordNotFound) {
-			return AuthIdentity{}, nil, ErrRefreshTokenInvalid
-		}
-		return AuthIdentity{}, nil, err
-	}
-	identity := AuthIdentity{
-		UserID:          session.UserID,
-		SessionID:       session.SID,
-		UserAuthVersion: session.UserAuthVersion,
-		SessionVersion:  session.Version,
-	}
-	_, user, err := ValidateLoginSession(identity)
-	if err != nil {
-		return AuthIdentity{}, nil, err
-	}
-	return identity, user, nil
 }
 
 func RevokeByRefreshToken(rawRefreshToken, expectedSID, reason string) error {
