@@ -117,13 +117,26 @@ export function TemperaturePanel() {
   }
 
   const history = useMemo(() => {
-    if (!data?.history || data.history.length === 0) {
-      if (current.cpu > 0 || current.nvme > 0 || current.pch > 0) {
-        return [current]
+    const rawList =
+      data?.history && data.history.length > 0
+        ? data.history
+        : current.cpu > 0 || current.nvme > 0 || current.pch > 0
+          ? [current]
+          : []
+
+    return rawList.map((item) => {
+      let localTimeStr = item.time_str
+      if (item.timestamp > 0) {
+        const date = new Date(item.timestamp * 1000)
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        localTimeStr = `${hours}:${minutes}`
       }
-      return []
-    }
-    return data.history
+      return {
+        ...item,
+        time_str: localTimeStr,
+      }
+    })
   }, [data?.history, current])
 
   const cpuTone = getTempTone(current.cpu, 'cpu')
