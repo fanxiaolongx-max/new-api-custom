@@ -118,6 +118,18 @@ export function MultiModelBar({
     onConfigChange('compareModels', nextModels)
   }
 
+  const handleReplaceModel = (index: number, newModel: string) => {
+    if (compareModels[index] === newModel) return
+    if (compareModels.includes(newModel)) {
+      toast.info(t('Model already in comparison list'))
+      return
+    }
+    const nextModels = [...compareModels]
+    nextModels[index] = newModel
+    onConfigChange('compareModels', nextModels)
+    toast.success(t('Swapped model'))
+  }
+
   const handleApplyPreset = (presetModels: string[]) => {
     // Filter only available models
     const available = presetModels.filter((m) =>
@@ -188,31 +200,68 @@ export function MultiModelBar({
               const colorScheme =
                 MODEL_COLOR_SCHEMES[index % MODEL_COLOR_SCHEMES.length]
               return (
-                <div
-                  key={modelName}
-                  className={cn(
-                    'group flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium shadow-2xs transition-all',
-                    colorScheme.badge
-                  )}
-                >
-                  <span
-                    className={cn('size-1.5 rounded-full animate-pulse', colorScheme.dot)}
-                  />
-                  <BotIcon size={12} />
-                  <span className='max-w-[120px] truncate font-mono text-[11px] font-semibold sm:max-w-[160px]'>
-                    {modelName}
-                  </span>
-                  {compareModels.length > 2 && (
-                    <button
-                      type='button'
-                      disabled={disabled}
-                      onClick={() => handleRemoveModel(modelName)}
-                      className='ml-0.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100'
-                    >
-                      <XIcon size={10} />
-                    </button>
-                  )}
-                </div>
+                <DropdownMenu key={`${modelName}-${index}`}>
+                  <DropdownMenuTrigger
+                    render={
+                      <div
+                        role='button'
+                        tabIndex={0}
+                        className={cn(
+                          'group flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-medium shadow-2xs transition-all hover:scale-105 cursor-pointer',
+                          colorScheme.badge
+                        )}
+                        title={t('Click to replace model')}
+                      />
+                    }
+                  >
+                    <span
+                      className={cn('size-1.5 rounded-full animate-pulse', colorScheme.dot)}
+                    />
+                    <BotIcon size={12} />
+                    <span className='max-w-[120px] truncate font-mono text-[11px] font-semibold sm:max-w-[160px]'>
+                      {modelName}
+                    </span>
+                    {compareModels.length > 2 && (
+                      <span
+                        role='button'
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleRemoveModel(modelName)
+                        }}
+                        className='ml-0.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100 hover:text-destructive'
+                        title={t('Remove from comparison')}
+                      >
+                        <XIcon size={10} />
+                      </span>
+                    )}
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align='start' className='max-h-72 w-56 overflow-y-auto'>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
+                        {t('Replace with model')}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {models.map((m) => (
+                        <DropdownMenuItem
+                          key={m.value}
+                          disabled={compareModels.includes(m.value) && m.value !== modelName}
+                          onClick={() => handleReplaceModel(index, m.value)}
+                          className='text-xs font-mono'
+                        >
+                          <BotIcon className='mr-2 size-3.5' />
+                          <span className='truncate'>{m.label || m.value}</span>
+                          {m.value === modelName && (
+                            <span className='ml-auto text-[10px] text-muted-foreground'>
+                              ({t('Current')})
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )
             })}
           </div>
