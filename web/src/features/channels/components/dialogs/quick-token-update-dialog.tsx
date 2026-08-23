@@ -36,7 +36,10 @@ import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { testChannel, updateChannel } from '@/features/channels/api'
-import { analyzeChannelTokenExpiry } from '@/features/channels/lib/channel-token-utils'
+import {
+  analyzeChannelTokenExpiry,
+  extractAccessTokenFromInput,
+} from '@/features/channels/lib/channel-token-utils'
 import type { Channel } from '@/features/channels/types'
 import { cn } from '@/lib/utils'
 
@@ -75,10 +78,14 @@ export function QuickTokenUpdateDialog({
     return analyzeChannelTokenExpiry(channel.key)
   }, [channel?.key])
 
-  const newExpiry = useMemo(() => {
-    if (!newToken.trim()) return null
-    return analyzeChannelTokenExpiry(newToken)
+  const { cleanToken, isJsonExtracted } = useMemo(() => {
+    return extractAccessTokenFromInput(newToken)
   }, [newToken])
+
+  const newExpiry = useMemo(() => {
+    if (!cleanToken.trim()) return null
+    return analyzeChannelTokenExpiry(cleanToken)
+  }, [cleanToken])
 
   const handlePaste = async () => {
     try {
@@ -94,7 +101,7 @@ export function QuickTokenUpdateDialog({
 
   const handleSaveAndTest = async () => {
     if (!channel?.id) return
-    const tokenToSave = newToken.trim()
+    const tokenToSave = cleanToken.trim()
     if (!tokenToSave) {
       toast.error(t('Please enter or paste the new token'))
       return
@@ -102,7 +109,7 @@ export function QuickTokenUpdateDialog({
 
     setIsSaving(true)
     try {
-      // 1. Update channel token
+      // 1. Update channel token with clean extracted token
       const updateRes = await updateChannel(channel.id, { key: tokenToSave })
       if (!updateRes.success) {
         throw new Error(updateRes.message || t('Failed to update channel token'))
@@ -247,10 +254,22 @@ export function QuickTokenUpdateDialog({
           <Textarea
             value={newToken}
             onChange={(e) => setNewToken(e.target.value)}
-            placeholder='eyJhbGciOiJSUzI1NiIsImtpZCI6... (请粘贴新的 AccessToken)'
+            placeholder='可直接粘贴整个 https://chatgpt.com/api/auth/session 返回的全部 JSON 内容，或单独粘贴 AccessToken...'
             className='min-h-[100px] font-mono text-xs leading-relaxed resize-y'
           />
         </div>
+
+        {/* JSON Extraction Badge */}
+        {isJsonExtracted && (
+          <div className='flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 border border-primary/25 rounded-lg px-3 py-1.5'>
+            <Sparkles size={13} className='text-amber-500 shrink-0' />
+            <span>
+              {t('Smart Recognition: Extracted accessToken ({{len}} chars) from Session JSON successfully!', {
+                len: cleanToken.length,
+              })}
+            </span>
+          </div>
+        )}
 
         {/* New Token Realtime Analysis Preview */}
         {newExpiry && (
@@ -291,7 +310,7 @@ export function QuickTokenUpdateDialog({
             ) : (
               <div className='text-[11px] text-muted-foreground'>
                 {t('Standard Key format detected (length: {{len}} chars)', {
-                  len: newToken.length,
+                  len: cleanToken.length,
                 })}
               </div>
             )}
@@ -301,31 +320,37 @@ export function QuickTokenUpdateDialog({
         {/* How to get AccessToken helper */}
         <div className='rounded-xl border border-dashed border-border/80 bg-muted/25 p-3 text-xs text-muted-foreground space-y-1.5'>
           <div className='font-semibold text-foreground flex items-center justify-between'>
-            <span>{t('💡 How to extract new ChatGPT AccessToken?')}</span>
+            <span>{t('💡 极速获取 AccessToken 步骤：')}</span>
             <a
               href='https://chatgpt.com/api/auth/session'
               target='_blank'
               rel='noreferrer'
-              className='inline-flex items-center gap-1 text-primary hover:underline text-[11px]'
+              className='inline-flex items-center gap-1 text-primary hover:underline text-[11px] font-medium'
             >
-              <span>{t('Open Session URL')}</span>
+              <span>{t('打开官方 Session 链接')}</span>
               <ExternalLink size={11} />
             </a>
           </div>
-          <ol className='list-decimal list-inside space-y-0.5 text-[11px] leading-relaxed'>
-            <li>{t('Log in to your account at chatgpt.com')}</li>
-            <li>
-              {t('Visit')}{' '}
-              <code className='bg-muted px-1 py-0.5 rounded font-mono text-[10px] text-foreground select-all'>
+          <ol className='list-decimal list-inside space-y-1 text-[11px] leading-relaxed'>
+            <li>{t('在浏览器登录 chatgpt.com 后，访问：')}{' '}
+              <a
+                href='https://chatgpt.com/api/auth/session'
+                target='_blank'
+                rel='noreferrer'
+                className='text-primary underline font-mono select-all'
+              >
                 https://chatgpt.com/api/auth/session
-              </code>
+              </a>
             </li>
             <li>
-              {t('Copy the full string inside ')}
-              <code className='bg-muted px-1 py-0.5 rounded font-mono text-[10px] text-foreground font-semibold'>
-                "accessToken"
-              </code>{' '}
-              {t('and paste it above.')}
+              {t('直接按 ')}
+              <kbd className='bg-muted px-1 py-0.5 rounded font-mono text-[10px] text-foreground font-semibold'>
+                Ctrl+A
+              </kbd>{' '}
+              {t('或全选并复制页面上的全部 JSON 内容（无需手动寻找 token）')}
+            </li>
+            <li>
+              {t('直接粘贴到上方输入框，系统将自动提取 accessToken 并解析，点击「保存并生效」即可！')}
             </li>
           </ol>
         </div>

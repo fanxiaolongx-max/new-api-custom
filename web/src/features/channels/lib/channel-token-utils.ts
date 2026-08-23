@@ -32,19 +32,68 @@ export type ChannelTokenExpiryInfo = {
 }
 
 /**
+ * Extract clean accessToken from raw text, JSON object, or session dump
+ */
+export function extractAccessTokenFromInput(input: string): {
+  cleanToken: string
+  isJsonExtracted: boolean
+} {
+  if (!input || typeof input !== 'string') {
+    return { cleanToken: '', isJsonExtracted: false }
+  }
+  const text = input.trim()
+
+  // 1. Try parsing full JSON from chatgpt.com/api/auth/session
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(text)
+      if (typeof parsed?.accessToken === 'string' && parsed.accessToken.trim()) {
+        return {
+          cleanToken: parsed.accessToken.trim(),
+          isJsonExtracted: true,
+        }
+      }
+    } catch {
+      // ignore parse error, continue regex fallback
+    }
+  }
+
+  // 2. Regex match for "accessToken": "eyJ..."
+  const jsonMatch = text.match(/"accessToken"\s*:\s*"([^"]+)"/)
+  if (jsonMatch && jsonMatch[1]) {
+    return {
+      cleanToken: jsonMatch[1].trim(),
+      isJsonExtracted: true,
+    }
+  }
+
+  // 3. Regex match for raw JWT token (eyJ...)
+  const jwtMatch = text.match(/eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/)
+  if (jwtMatch && jwtMatch[0]) {
+    const isFullText = jwtMatch[0] === text
+    return {
+      cleanToken: jwtMatch[0],
+      isJsonExtracted: !isFullText,
+    }
+  }
+
+  return {
+    cleanToken: text,
+    isJsonExtracted: false,
+  }
+}
+
+/**
  * Safely parse a JWT without full verification to extract expiry and metadata
  */
 export function parseJwtPayload(token: string): Record<string, any> | null {
   if (!token || typeof token !== 'string') return null
-  const cleanToken = token.trim()
+  const { cleanToken } = extractAccessTokenFromInput(token)
 
   // Extract first JWT token if multiple are passed or prefixed
   const parts = cleanToken.split('.')
   if (parts.length < 3) {
-    // Check if token is embedded in multiline text
-    const match = cleanToken.match(/eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/)
-    if (!match) return null
-    return parseJwtPayload(match[0])
+    return null
   }
 
   try {
