@@ -62,8 +62,9 @@ async function fetchLogStats<T>(
   const queryParams = buildQueryParams(
     params as unknown as Record<string, unknown>
   )
-  const path = buildApiPath(endpoint, isAdmin)
-  const res = await api.get(`${path}/stat?${queryParams}`)
+  const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint
+  const path = isAdmin ? `${cleanEndpoint}/stat` : `${cleanEndpoint}/self/stat`
+  const res = await api.get(`${path}?${queryParams}`)
   return res.data
 }
 
