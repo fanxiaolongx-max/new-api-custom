@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  Bot,
   Box,
   CreditCard,
   FileText,
@@ -34,6 +35,7 @@ import {
   User,
   Users,
   Wallet,
+  Zap,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -149,6 +151,20 @@ export function useSidebarData(): SidebarData {
             title: t('System Info'),
             url: '/system-info',
             icon: ServerCog,
+            requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            title: 'Grok2API',
+            url: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000',
+            icon: Bot,
+            external: true,
+            requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            title: 'GPT2API (Chat2API)',
+            url: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:5005` : 'http://localhost:5005',
+            icon: Zap,
+            external: true,
             requiredRole: ROLE.SUPER_ADMIN,
           },
           {

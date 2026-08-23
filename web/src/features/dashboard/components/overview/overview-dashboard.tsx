@@ -65,6 +65,7 @@ import { ApiInfoPanel } from './api-info-panel'
 import { ChannelTokenExpiryBanner } from './channel-token-expiry-banner'
 import { FAQPanel } from './faq-panel'
 import { PerformanceHealthPanel } from './performance-health-panel'
+import { ServicesHubPanel } from './services-hub-panel'
 import { SummaryCards } from './summary-cards'
 import { TemperaturePanel } from './temperature-panel'
 import { UptimePanel } from './uptime-panel'
@@ -774,6 +775,9 @@ export function OverviewDashboard() {
             >
               {isAdmin && (
                 <>
+                  <CardStaggerItem className='lg:col-span-2'>
+                    <ServicesHubPanel />
+                  </CardStaggerItem>
                   <CardStaggerItem className='lg:col-span-2'>
                     <PerformanceHealthPanel />
                   </CardStaggerItem>

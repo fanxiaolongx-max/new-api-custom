@@ -34,7 +34,8 @@ import type {
 // ============================================================================
 
 function buildApiPath(endpoint: string, isAdmin: boolean): string {
-  return isAdmin ? endpoint : `${endpoint}/self`
+  const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint
+  return isAdmin ? `${cleanEndpoint}/` : `${cleanEndpoint}/self`
 }
 
 async function fetchLogs<T>(
