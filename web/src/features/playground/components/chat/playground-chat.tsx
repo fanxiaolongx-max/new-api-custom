@@ -86,6 +86,7 @@ export function PlaygroundChat({
   mode,
 }: PlaygroundChatProps) {
   const { t } = useTranslation()
+  const isCompare = mode === 'compare'
   const [editText, setEditText] = useState('')
   const [originalText, setOriginalText] = useState('')
   const [sourceMessageKeys, setSourceMessageKeys] = useState<
@@ -243,8 +244,6 @@ export function PlaygroundChat({
       </div>,
     ]
   }
-
-  const isCompare = mode === 'compare'
 
   return (
     <Conversation>
