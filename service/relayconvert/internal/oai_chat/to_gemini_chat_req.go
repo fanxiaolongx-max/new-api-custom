@@ -161,22 +161,25 @@ func OpenAIChatRequestToGeminiGenerateContent(c *gin.Context, textRequest dto.Ge
 	}
 	geminiRequest.SafetySettings = safetySettings
 
-	if textRequest.Tools != nil {
+	if textRequest.Tools != nil || textRequest.WebSearchOptions != nil {
 		functions := make([]dto.FunctionRequest, 0, len(textRequest.Tools))
-		googleSearch := false
+		googleSearch := textRequest.WebSearchOptions != nil
 		codeExecution := false
 		urlContext := false
 		for _, tool := range textRequest.Tools {
-			if tool.Function.Name == "googleSearch" {
+			if tool.Function.Name == "googleSearch" || tool.Function.Name == "web_search" || tool.Function.Name == "web_search_preview" || tool.Type == "web_search" || tool.Type == "web_search_preview" {
 				googleSearch = true
 				continue
 			}
-			if tool.Function.Name == "codeExecution" {
+			if tool.Function.Name == "codeExecution" || tool.Type == "code_interpreter" {
 				codeExecution = true
 				continue
 			}
 			if tool.Function.Name == "urlContext" {
 				urlContext = true
+				continue
+			}
+			if tool.Function.Name == "" {
 				continue
 			}
 			if tool.Function.Parameters != nil {
