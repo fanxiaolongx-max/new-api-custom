@@ -70,6 +70,7 @@ interface PlaygroundChatProps {
 }
 
 export function PlaygroundChat({
+  config,
   messages,
   onCopyMessage,
   onRegenerateMessage,
