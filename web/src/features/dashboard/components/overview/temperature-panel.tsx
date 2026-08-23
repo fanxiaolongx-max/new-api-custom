@@ -220,20 +220,26 @@ export function TemperaturePanel() {
 
         {/* 传感器详情折叠列表 */}
         {showSensorsDetail && data?.sensors && data.sensors.length > 0 && (
-          <div className='rounded-xl border bg-muted/20 p-3'>
-            <div className='mb-2 text-[11px] font-medium text-muted-foreground'>
-              {t('Detected Hardware Sensors')}
+          <div className='rounded-xl border bg-muted/20 p-3.5 space-y-2.5'>
+            <div className='flex items-center justify-between text-[11px] font-medium text-muted-foreground'>
+              <span>{t('Detected Hardware Sensors')} ({data.sensors.length})</span>
+              <span className='text-[10px] text-muted-foreground/70'>Linux hwmon / thermal_zone</span>
             </div>
-            <div className='grid grid-cols-1 gap-1.5 sm:grid-cols-2 md:grid-cols-3'>
+            <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3'>
               {data.sensors.map((sensor, idx) => (
                 <div
                   key={`${sensor.name}-${sensor.label}-${idx}`}
-                  className='flex items-center justify-between rounded-lg bg-background/60 px-2.5 py-1.5 text-xs'
+                  className='flex items-center justify-between gap-2 rounded-lg border bg-background/80 px-3 py-2 text-xs shadow-2xs hover:bg-muted/30 transition-colors'
                 >
-                  <span className='truncate font-mono text-[11px] text-muted-foreground' title={`${sensor.name}: ${sensor.label}`}>
-                    {sensor.label || sensor.name}
-                  </span>
-                  <span className='font-mono font-semibold tabular-nums ml-2'>
+                  <div className='flex flex-col min-w-0 pr-1'>
+                    <span className='font-medium text-[12px] text-foreground truncate' title={sensor.display_name || sensor.label || sensor.name}>
+                      {sensor.display_name || sensor.label || sensor.name}
+                    </span>
+                    <span className='font-mono text-[10px] text-muted-foreground/70 truncate' title={`${sensor.name}: ${sensor.label}`}>
+                      {sensor.label && sensor.label !== sensor.display_name ? sensor.label : sensor.name}
+                    </span>
+                  </div>
+                  <span className='font-mono font-semibold text-sm tabular-nums text-foreground shrink-0'>
                     {sensor.temp_c.toFixed(1)}°C
                   </span>
                 </div>

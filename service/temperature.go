@@ -40,10 +40,11 @@ const (
 )
 
 type SensorMetric struct {
-	Name     string  `json:"name"`
-	Label    string  `json:"label"`
-	TempC    float64 `json:"temp_c"`
-	Category string  `json:"category"` // "cpu", "nvme", "pch", "other"
+	Name        string  `json:"name"`         // 硬件驱动名 (如 coretemp, nvme, pch_cannonlake)
+	Label       string  `json:"label"`        // 硬件原始标签 (如 Package id 0, Core 0, Composite)
+	DisplayName string  `json:"display_name"` // 友好中文名 (如 "CPU 封装总温", "CPU 核心 0", "NVMe 固态硬盘")
+	TempC       float64 `json:"temp_c"`
+	Category    string  `json:"category"`     // "cpu", "nvme", "pch", "wifi", "gpu", "other"
 }
 
 type TemperaturePoint struct {
@@ -70,16 +71,13 @@ var (
 	monitorOnceStart sync.Once
 )
 
-// StartSystemTemperatureMonitor 启动周期温度监测协程
+// StartSystemTemperatureMonitor 启动硬件温度周期监控协程
 func StartSystemTemperatureMonitor() {
 	monitorOnceStart.Do(func() {
-		// 1. 初始化从 Redis 加载历史记录（如有）
 		loadHistoryFromRedis()
-
-		// 2. 立即进行首次采样
+		// 启动时立即采集一次
 		CollectTemperatureSample()
 
-		// 3. 开启周期采样协程
 		go func() {
 			ticker := time.NewTicker(TemperatureInterval)
 			defer ticker.Stop()
@@ -90,14 +88,17 @@ func StartSystemTemperatureMonitor() {
 	})
 }
 
-// CollectTemperatureSample 采集一次最新硬件温度
+// CollectTemperatureSample 执行一次硬件温度采样并持久化
 func CollectTemperatureSample() TemperatureOverview {
 	sensors := scanHardwareSensors()
 	now := time.Now()
 	timestamp := now.Unix()
 	timeStr := now.Format("15:04")
 
-	var cpuTemps, nvmeTemps, pchTemps []float64
+	var cpuTemps []float64
+	var nvmeTemps []float64
+	var pchTemps []float64
+
 	for _, s := range sensors {
 		switch s.Category {
 		case "cpu":
@@ -167,6 +168,7 @@ func GetSystemTemperatureOverview() TemperatureOverview {
 // scanHardwareSensors 遍历 Linux sysfs 硬件温度传感器
 func scanHardwareSensors() []SensorMetric {
 	var metrics []SensorMetric
+	seenNames := make(map[string]bool)
 
 	// 1. 扫描 /sys/class/hwmon 与 /host/sys/class/hwmon
 	hwmonBases := []string{"/sys/class/hwmon", "/host/sys/class/hwmon"}
@@ -197,17 +199,22 @@ func scanHardwareSensors() []SensorMetric {
 						// 读取对应 label（如 temp1_label）
 						labelFile := strings.Replace(fName, "_input", "_label", 1)
 						labelBytes, _ := os.ReadFile(filepath.Join(hwmonPath, labelFile))
-						label := strings.TrimSpace(string(labelBytes))
-						if label == "" {
-							label = fName
+						rawLabel := strings.TrimSpace(string(labelBytes))
+						if rawLabel == "" {
+							rawLabel = hwName
 						}
 
-						cat := categorizeSensor(hwName, label)
+						displayName, cat := formatSensorDisplayName(hwName, rawLabel)
+						seenNames[hwName] = true
+						seenNames[rawLabel] = true
+						seenNames[displayName] = true
+
 						metrics = append(metrics, SensorMetric{
-							Name:     hwName,
-							Label:    label,
-							TempC:    roundToOneDecimal(tempC),
-							Category: cat,
+							Name:        hwName,
+							Label:       rawLabel,
+							DisplayName: displayName,
+							TempC:       roundToOneDecimal(tempC),
+							Category:    cat,
 						})
 					}
 				}
@@ -215,7 +222,7 @@ func scanHardwareSensors() []SensorMetric {
 		}
 	}
 
-	// 2. 如果 hwmon 没有扫到足够信息，补充扫描 /sys/class/thermal/thermal_zone*
+	// 2. 补充扫描 /sys/class/thermal/thermal_zone*，智能去重
 	thermalBases := []string{"/sys/class/thermal", "/host/sys/class/thermal"}
 	for _, base := range thermalBases {
 		if entries, err := os.ReadDir(base); err == nil {
@@ -235,74 +242,143 @@ func scanHardwareSensors() []SensorMetric {
 					}
 					tempC := milli / 1000.0
 
-					// 检查是否已经在 hwmon 中录入（避免重复）
-					alreadyFound := false
-					for _, m := range metrics {
-						if m.Name == zType || m.Label == zType {
-							alreadyFound = true
-							break
-						}
+					displayName, cat := formatSensorDisplayName(entry.Name(), zType)
+
+					// 检查是否已经在 hwmon 中录入（避免重复，如 x86_pkg_temp 与 Package id 0 重复、acpitz 重复等）
+					if seenNames[zType] || seenNames[displayName] {
+						continue
 					}
 
-					if !alreadyFound {
-						cat := categorizeSensor(zType, zType)
-						metrics = append(metrics, SensorMetric{
-							Name:     entry.Name(),
-							Label:    zType,
-							TempC:    roundToOneDecimal(tempC),
-							Category: cat,
-						})
-					}
+					seenNames[zType] = true
+					seenNames[displayName] = true
+
+					metrics = append(metrics, SensorMetric{
+						Name:        entry.Name(),
+						Label:       zType,
+						DisplayName: displayName,
+						TempC:       roundToOneDecimal(tempC),
+						Category:    cat,
+					})
 				}
 			}
 		}
 	}
 
-	// 排序：CPU -> NVMe -> PCH -> Other
+	// 排序：CPU -> NVMe -> PCH -> Wi-Fi -> GPU -> Other
+	categoryOrder := map[string]int{
+		"cpu":   1,
+		"nvme":  2,
+		"pch":   3,
+		"wifi":  4,
+		"gpu":   5,
+		"other": 6,
+	}
+
 	sort.Slice(metrics, func(i, j int) bool {
-		order := map[string]int{"cpu": 1, "nvme": 2, "pch": 3, "other": 4}
-		return order[metrics[i].Category] < order[metrics[j].Category]
+		oi := categoryOrder[metrics[i].Category]
+		oj := categoryOrder[metrics[j].Category]
+		if oi != oj {
+			return oi < oj
+		}
+		return metrics[i].DisplayName < metrics[j].DisplayName
 	})
 
 	return metrics
 }
 
-// categorizeSensor 判断传感器分类
-func categorizeSensor(name, label string) string {
-	combined := strings.ToLower(name + " " + label)
+// formatSensorDisplayName 智能识别硬件传感器并生成中文友好名
+func formatSensorDisplayName(hwName, rawLabel string) (displayName, category string) {
+	nameLower := strings.ToLower(hwName)
+	labelLower := strings.ToLower(rawLabel)
+	combined := nameLower + " " + labelLower
 
-	// CPU 判定
-	if strings.Contains(combined, "coretemp") ||
-		strings.Contains(combined, "package id") ||
-		strings.Contains(combined, "x86_pkg_temp") ||
-		strings.Contains(combined, "k10temp") ||
-		strings.Contains(combined, "zenpower") ||
-		strings.Contains(combined, "tdie") ||
-		strings.Contains(combined, "tctl") ||
-		strings.Contains(combined, "cpu") {
-		return "cpu"
+	// 1. CPU 核心与封装
+	if strings.Contains(labelLower, "package id") || strings.Contains(labelLower, "x86_pkg_temp") {
+		return "CPU 封装总温", "cpu"
+	}
+	if strings.HasPrefix(labelLower, "core ") {
+		coreNum := strings.TrimPrefix(labelLower, "core ")
+		return "CPU 核心 " + coreNum, "cpu"
+	}
+	if strings.Contains(combined, "coretemp") && strings.HasPrefix(rawLabel, "temp") {
+		return "CPU 核心温度", "cpu"
+	}
+	if strings.Contains(combined, "tdie") || strings.Contains(combined, "tctl") {
+		return "CPU 核心温度 (AMD)", "cpu"
+	}
+	if strings.Contains(labelLower, "b0d4") {
+		return "CPU 功耗温控 (DPTF)", "cpu"
 	}
 
-	// NVMe 固态硬盘判定
-	if strings.Contains(combined, "nvme") ||
-		strings.Contains(combined, "composite") ||
-		strings.Contains(combined, "drive") ||
-		strings.Contains(combined, "ssd") {
-		return "nvme"
+	// 2. NVMe / 存储
+	if strings.Contains(combined, "nvme") || strings.Contains(labelLower, "composite") || strings.Contains(combined, "ssd") {
+		if strings.Contains(labelLower, "sensor 1") {
+			return "NVMe 闪存颗粒 1", "nvme"
+		}
+		if strings.Contains(labelLower, "sensor 2") {
+			return "NVMe 闪存颗粒 2", "nvme"
+		}
+		return "NVMe 固态硬盘", "nvme"
 	}
 
-	// 主板芯片组 PCH / ACPI 判定
-	if strings.Contains(combined, "pch") ||
-		strings.Contains(combined, "cannonlake") ||
-		strings.Contains(combined, "acpitz") ||
-		strings.Contains(combined, "int3400") ||
-		strings.Contains(combined, "motherboard") ||
-		strings.Contains(combined, "sen") ||
-		strings.Contains(combined, "b0d4") {
-		return "pch"
+	// 3. 主板南桥 / PCH
+	if strings.Contains(combined, "pch") || strings.Contains(combined, "cannonlake") || strings.Contains(combined, "cometlake") || strings.Contains(combined, "tigerlake") {
+		return "主板南桥芯片 (PCH)", "pch"
 	}
 
-	return "other"
+	// 4. Wi-Fi / 无线网卡
+	if strings.Contains(combined, "iwlwifi") || strings.Contains(combined, "wifi") || strings.Contains(combined, "wlan") || strings.Contains(combined, "ath9k") || strings.Contains(combined, "rtw") {
+		return "无线网卡 (Wi-Fi)", "wifi"
+	}
+
+	// 5. 显卡 GPU
+	if strings.Contains(combined, "nouveau") || strings.Contains(combined, "nvidia") || strings.Contains(combined, "amdgpu") || strings.Contains(combined, "radeon") {
+		return "独立显卡 (GPU)", "gpu"
+	}
+
+	// 6. 电池 / 电源
+	if strings.Contains(combined, "bat") || strings.Contains(combined, "battery") {
+		return "电池组温度", "other"
+	}
+
+	// 7. ACPI / 散热管理
+	if strings.Contains(labelLower, "int3400") {
+		return "散热策略管理框架", "other"
+	}
+	if strings.Contains(labelLower, "acpitz") || strings.Contains(combined, "acpitz") {
+		return "ACPI 主板环境温", "pch"
+	}
+
+	// 8. SEN1 ~ SEN8 主板辅助热敏电阻
+	if strings.HasPrefix(strings.ToUpper(rawLabel), "SEN") {
+		senNum := strings.TrimPrefix(strings.ToUpper(rawLabel), "SEN")
+		switch senNum {
+		case "1":
+			return "主板供电/内存区 (SEN1)", "pch"
+		case "2":
+			return "主板进风口区 (SEN2)", "pch"
+		case "3":
+			return "机壳掌托区 1 (SEN3)", "other"
+		case "4":
+			return "机壳掌托区 2 (SEN4)", "other"
+		case "5":
+			return "电池仓环境 (SEN5)", "other"
+		case "6":
+			return "底壳散热出风口 (SEN6)", "other"
+		case "7":
+			return "侧边扩展区 (SEN7)", "other"
+		default:
+			return "主板探头 SEN" + senNum, "other"
+		}
+	}
+
+	if rawLabel != "" && !strings.HasPrefix(rawLabel, "temp") {
+		return rawLabel, "other"
+	}
+	if hwName != "" && !strings.HasPrefix(hwName, "temp") {
+		return hwName, "other"
+	}
+	return "硬件温度传感器", "other"
 }
 
 func calcRepresentativeTemp(temps []float64) float64 {

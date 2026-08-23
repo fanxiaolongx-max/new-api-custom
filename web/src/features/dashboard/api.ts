@@ -99,8 +99,9 @@ export async function getUptimeStatus() {
 export interface SensorMetric {
   name: string
   label: string
+  display_name?: string
   temp_c: number
-  category: 'cpu' | 'nvme' | 'pch' | 'other'
+  category: 'cpu' | 'nvme' | 'pch' | 'wifi' | 'gpu' | 'other'
 }
 
 export interface TemperaturePoint {
