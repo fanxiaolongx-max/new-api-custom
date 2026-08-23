@@ -66,11 +66,13 @@ func StartSystemInstanceReporter() {
 	systemInstanceReporterOnce.Do(func() {
 		gopool.Go(func() {
 			reportSystemInstanceWithLog()
+			_, _ = model.DeleteStaleSystemInstances(common.GetTimestamp())
 
 			ticker := time.NewTicker(systemInstanceReportInterval)
 			defer ticker.Stop()
 			for range ticker.C {
 				reportSystemInstanceWithLog()
+				_, _ = model.DeleteStaleSystemInstances(common.GetTimestamp())
 			}
 		})
 	})
