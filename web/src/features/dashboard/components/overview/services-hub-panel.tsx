@@ -40,11 +40,11 @@ export function ServicesHubPanel() {
     {
       id: 'grok2api',
       name: 'Grok2API 控制台',
-      badge: 'Port :8000',
+      badge: '/grok2api/',
       description: t(
         'Grok 网页转 API 服务控制台，支持账号池、Token 轮询、模型配置与生图管理。'
       ),
-      url: `${protocol}//${host}:8000`,
+      url: '/grok2api/',
       icon: Bot,
       color: 'text-violet-500',
       bg: 'bg-violet-500/10 border-violet-500/25 hover:border-violet-500/50',
@@ -53,11 +53,11 @@ export function ServicesHubPanel() {
     {
       id: 'chat2api',
       name: 'GPT2API (Chat2API)',
-      badge: 'Port :5005',
+      badge: '/chat2api/',
       description: t(
         'ChatGPT Web-to-API 转换服务，支持官方网页端 AccessToken 鉴权与反代中转。'
       ),
-      url: `${protocol}//${host}:5005`,
+      url: '/chat2api/',
       icon: Zap,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10 border-emerald-500/25 hover:border-emerald-500/50',

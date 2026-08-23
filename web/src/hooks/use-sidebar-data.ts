@@ -155,14 +155,14 @@ export function useSidebarData(): SidebarData {
           },
           {
             title: 'Grok2API',
-            url: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:8000` : 'http://localhost:8000',
+            url: '/grok2api/',
             icon: Bot,
             external: true,
             requiredRole: ROLE.SUPER_ADMIN,
           },
           {
             title: 'GPT2API (Chat2API)',
-            url: typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.hostname}:5005` : 'http://localhost:5005',
+            url: '/chat2api/',
             icon: Zap,
             external: true,
             requiredRole: ROLE.SUPER_ADMIN,
