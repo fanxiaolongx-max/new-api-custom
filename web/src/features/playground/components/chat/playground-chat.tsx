@@ -26,6 +26,7 @@ import {
 } from '@/components/ai-elements/conversation'
 import { Loader } from '@/components/ai-elements/loader'
 import { Message } from '@/components/ai-elements/message'
+import { cn } from '@/lib/utils'
 
 import {
   getChatMessageRenderState,
