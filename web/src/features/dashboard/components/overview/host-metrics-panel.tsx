@@ -343,15 +343,39 @@ export function HostMetricsPanel() {
               </span>
             </div>
 
-            <div className='mt-3 space-y-1.5'>
-              <Progress
-                value={Math.min(100, Math.max(0, data?.storage?.usage_percent ?? 0))}
-                className={cn('h-1.5 w-full bg-muted/60', diskStatus.progressClass)}
-              />
-              <div className='text-[10px] text-muted-foreground font-mono'>
-                {t('Free space')}: {formatBytes(data?.storage?.free_bytes)}
+            {data?.storage?.disks && data.storage.disks.length > 1 ? (
+              <div className='mt-2.5 space-y-1.5 border-t pt-1.5'>
+                {data.storage.disks.map((d, i) => {
+                  const dStatus = getUsageStatus(d.usage_percent)
+                  return (
+                    <div key={i} className='space-y-0.5'>
+                      <div className='flex items-center justify-between text-[10px] font-mono text-muted-foreground'>
+                        <span className='truncate max-w-[120px]' title={d.display_name || d.mount_point}>
+                          {d.display_name || d.mount_point}
+                        </span>
+                        <span className='font-medium text-foreground'>
+                          {d.usage_percent.toFixed(0)}% ({formatBytes(d.used_bytes)} / {formatBytes(d.total_bytes)})
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(100, Math.max(0, d.usage_percent))}
+                        className={cn('h-1 w-full bg-muted/60', dStatus.progressClass)}
+                      />
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            ) : (
+              <div className='mt-3 space-y-1.5'>
+                <Progress
+                  value={Math.min(100, Math.max(0, data?.storage?.usage_percent ?? 0))}
+                  className={cn('h-1.5 w-full bg-muted/60', diskStatus.progressClass)}
+                />
+                <div className='text-[10px] text-muted-foreground font-mono'>
+                  {t('Free space')}: {formatBytes(data?.storage?.free_bytes)}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 4. 系统负载与运行时间 */}
@@ -504,6 +528,28 @@ export function HostMetricsPanel() {
                 </div>
               </div>
             </div>
+
+            {data.storage?.disks && data.storage.disks.length > 0 && (
+              <div className='pt-2 border-t space-y-1.5'>
+                <div className='text-[10px] text-muted-foreground uppercase font-mono'>
+                  {t('Disk Partitions')}
+                </div>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono'>
+                  {data.storage.disks.map((d, i) => (
+                    <div key={i} className='rounded-lg bg-card p-2 border flex items-center justify-between'>
+                      <div className='truncate pr-2'>
+                        <div className='font-semibold'>{d.display_name}</div>
+                        <div className='text-[10px] text-muted-foreground'>{d.mount_point} · {d.fstype}</div>
+                      </div>
+                      <div className='text-right shrink-0'>
+                        <div className='font-semibold'>{d.usage_percent.toFixed(1)}%</div>
+                        <div className='text-[10px] text-muted-foreground'>{formatBytes(d.used_bytes)} / {formatBytes(d.total_bytes)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

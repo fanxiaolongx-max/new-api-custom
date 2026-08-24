@@ -20,8 +20,10 @@ For commercial licensing, please contact support@quantumnous.com
 package service
 
 import (
+	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,11 +69,23 @@ type MemoryInfo struct {
 	SwapUsagePercent float64 `json:"swap_usage_percent"`
 }
 
-type StorageInfo struct {
+type DiskPartitionInfo struct {
+	MountPoint   string  `json:"mount_point"`
+	Device       string  `json:"device"`
+	Fstype       string  `json:"fstype"`
 	TotalBytes   uint64  `json:"total_bytes"`
 	UsedBytes    uint64  `json:"used_bytes"`
 	FreeBytes    uint64  `json:"free_bytes"`
 	UsagePercent float64 `json:"usage_percent"`
+	DisplayName  string  `json:"display_name"`
+}
+
+type StorageInfo struct {
+	TotalBytes   uint64              `json:"total_bytes"`
+	UsedBytes    uint64              `json:"used_bytes"`
+	FreeBytes    uint64              `json:"free_bytes"`
+	UsagePercent float64             `json:"usage_percent"`
+	Disks        []DiskPartitionInfo `json:"disks,omitempty"`
 }
 
 type LoadAvgInfo struct {
@@ -203,19 +217,7 @@ func CollectHostMetricsSample() HostMetricsOverview {
 	}
 
 	// 4. Storage Info
-	var storageData StorageInfo
-	if dUsage, err := disk.Usage("/"); err == nil && dUsage != nil {
-		storageData.TotalBytes = dUsage.Total
-		storageData.UsedBytes = dUsage.Used
-		storageData.FreeBytes = dUsage.Free
-		storageData.UsagePercent = dUsage.UsedPercent
-	} else {
-		diskInfo := common.GetDiskSpaceInfo()
-		storageData.TotalBytes = diskInfo.Total
-		storageData.UsedBytes = diskInfo.Used
-		storageData.FreeBytes = diskInfo.Free
-		storageData.UsagePercent = diskInfo.UsedPercent
-	}
+	storageData := collectStorageMetrics()
 
 	// 5. Load Avg
 	var loadData LoadAvgInfo
@@ -289,3 +291,95 @@ func GetSystemHostMetricsOverview() HostMetricsOverview {
 	res.History = historyCopy
 	return res
 }
+
+func collectStorageMetrics() StorageInfo {
+	candidatePaths := []string{"/", "/mnt/data", "/host/mnt/data", "/data", "/home"}
+
+	// 查询系统所有物理磁盘分区
+	if parts, err := disk.Partitions(false); err == nil {
+		for _, p := range parts {
+			if !strings.HasPrefix(p.Device, "/dev/loop") &&
+				!strings.HasPrefix(p.Fstype, "tmpfs") &&
+				!strings.HasPrefix(p.Fstype, "devtmpfs") &&
+				!strings.HasPrefix(p.Fstype, "squashfs") &&
+				!strings.HasPrefix(p.Fstype, "overlay") &&
+				!strings.HasPrefix(p.Fstype, "shm") {
+				candidatePaths = append(candidatePaths, p.Mountpoint)
+			}
+		}
+	}
+
+	seenKeys := make(map[string]bool)
+	var diskList []DiskPartitionInfo
+	var sumTotal, sumUsed, sumFree uint64
+
+	for _, path := range candidatePaths {
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		u, err := disk.Usage(path)
+		if err != nil || u == nil || u.Total == 0 {
+			continue
+		}
+
+		// 通过总容量与已用容量去重（避免 Docker 容器内部重复挂载同一块物理分区）
+		dedupKey := fmt.Sprintf("%d_%d", u.Total, u.Used)
+		if seenKeys[dedupKey] {
+			continue
+		}
+		seenKeys[dedupKey] = true
+
+		displayName := "数据盘 (" + path + ")"
+		if path == "/" {
+			displayName = "系统盘 (/)"
+		} else if path == "/mnt/data" || path == "/host/mnt/data" {
+			displayName = "数据盘 (/mnt/data)"
+		}
+
+		dp := DiskPartitionInfo{
+			MountPoint:   path,
+			Device:       u.Fstype,
+			Fstype:       u.Fstype,
+			TotalBytes:   u.Total,
+			UsedBytes:    u.Used,
+			FreeBytes:    u.Free,
+			UsagePercent: u.UsedPercent,
+			DisplayName:  displayName,
+		}
+		diskList = append(diskList, dp)
+		sumTotal += u.Total
+		sumUsed += u.Used
+		sumFree += u.Free
+	}
+
+	if len(diskList) == 0 {
+		diskInfo := common.GetDiskSpaceInfo()
+		sumTotal = diskInfo.Total
+		sumUsed = diskInfo.Used
+		sumFree = diskInfo.Free
+		diskList = []DiskPartitionInfo{
+			{
+				MountPoint:   "/",
+				TotalBytes:   diskInfo.Total,
+				UsedBytes:    diskInfo.Used,
+				FreeBytes:    diskInfo.Free,
+				UsagePercent: diskInfo.UsedPercent,
+				DisplayName:  "系统盘 (/)",
+			},
+		}
+	}
+
+	var overallPercent float64
+	if sumTotal > 0 {
+		overallPercent = float64(sumUsed) / float64(sumTotal) * 100
+	}
+
+	return StorageInfo{
+		TotalBytes:   sumTotal,
+		UsedBytes:    sumUsed,
+		FreeBytes:    sumFree,
+		UsagePercent: overallPercent,
+		Disks:        diskList,
+	}
+}
+

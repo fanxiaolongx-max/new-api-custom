@@ -11,6 +11,7 @@ services:
     volumes:
       - ./data:/data
       - ./logs:/app/logs
+      - /mnt/data:/mnt/data:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro
       - /sys/class/thermal:/sys/class/thermal:ro
     environment:

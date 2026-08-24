@@ -33,6 +33,8 @@ func TestHostMetricsCollection(t *testing.T) {
 	require.NotEmpty(t, metrics.Host.Arch)
 	assert.Greater(t, metrics.CPU.LogicalCores, 0)
 	assert.Greater(t, metrics.Process.NumGoroutines, 0)
+	assert.Greater(t, metrics.Storage.TotalBytes, uint64(0))
+	assert.NotEmpty(t, metrics.Storage.Disks)
 	assert.Greater(t, metrics.UpdatedTime, int64(0))
 
 	overview := GetSystemHostMetricsOverview()

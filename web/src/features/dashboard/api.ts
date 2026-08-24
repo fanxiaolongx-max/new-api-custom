@@ -163,11 +163,23 @@ export interface MemoryInfo {
   swap_usage_percent: number
 }
 
+export interface DiskPartitionInfo {
+  mount_point: string
+  device: string
+  fstype: string
+  total_bytes: number
+  used_bytes: number
+  free_bytes: number
+  usage_percent: number
+  display_name: string
+}
+
 export interface StorageInfo {
   total_bytes: number
   used_bytes: number
   free_bytes: number
   usage_percent: number
+  disks?: DiskPartitionInfo[]
 }
 
 export interface LoadAvgInfo {
