@@ -135,6 +135,9 @@ func main() {
 	// Start system hardware temperature monitor
 	service.StartSystemTemperatureMonitor()
 
+	// Start system host CPU and memory metrics monitor
+	service.StartHostMetricsMonitor()
+
 	// Wire task polling adaptor factory (breaks service -> relay import cycle).
 	// Must run before the system task runner starts: the async_task_poll handler
 	// calls service.RunTaskPollingOnce, which needs this factory set.

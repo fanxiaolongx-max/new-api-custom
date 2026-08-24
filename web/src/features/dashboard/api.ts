@@ -130,3 +130,84 @@ export async function getSystemTemperature() {
   }>('/api/system/temperature')
   return res.data
 }
+
+// ----------------------------------------------------------------------------
+// System Host CPU & Memory Resource Monitoring
+// ----------------------------------------------------------------------------
+
+export interface HostInfo {
+  hostname: string
+  os: string
+  platform: string
+  arch: string
+  uptime: number
+  boot_time: number
+}
+
+export interface CPUInfo {
+  usage_percent: number
+  cores: number
+  logical_cores: number
+  model_name: string
+  mhz: number
+}
+
+export interface MemoryInfo {
+  total_bytes: number
+  used_bytes: number
+  free_bytes: number
+  available_bytes: number
+  usage_percent: number
+  swap_total_bytes: number
+  swap_used_bytes: number
+  swap_usage_percent: number
+}
+
+export interface StorageInfo {
+  total_bytes: number
+  used_bytes: number
+  free_bytes: number
+  usage_percent: number
+}
+
+export interface LoadAvgInfo {
+  load1: number
+  load5: number
+  load15: number
+}
+
+export interface ProcessInfo {
+  num_goroutines: number
+  alloc_bytes: number
+  sys_bytes: number
+  num_gc: number
+}
+
+export interface HostMetricsPoint {
+  timestamp: number
+  time_str: string
+  cpu: number
+  memory: number
+}
+
+export interface HostMetricsOverview {
+  host: HostInfo
+  cpu: CPUInfo
+  memory: MemoryInfo
+  storage: StorageInfo
+  load_avg: LoadAvgInfo
+  process: ProcessInfo
+  current: HostMetricsPoint
+  history: HostMetricsPoint[]
+  updated_time: number
+}
+
+export async function getSystemHostMetrics() {
+  const res = await api.get<{
+    success: boolean
+    data: HostMetricsOverview
+    message?: string
+  }>('/api/system/host-metrics')
+  return res.data
+}
+
