@@ -30,6 +30,7 @@ dist/
 build/
 electron/node_modules/
 electron/dist/
+web/src/i18n/locales/_reports/
 
 # 二进制文件与编译缓存
 new-api
