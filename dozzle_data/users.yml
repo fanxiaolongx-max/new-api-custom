@@ -1,0 +1,7 @@
+users:
+  admin:
+    email: ""
+    name: New API Admin
+    password: $2a$11$W1W4wuzO5l6IX6Pu6inuYegxk9kNfFPDNouIUh4tFgzS3Q8uvJ5Ly
+    filter: name=chat2api
+    roles: none

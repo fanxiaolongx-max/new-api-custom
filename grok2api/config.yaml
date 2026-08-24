@@ -1,0 +1,59 @@
+server:
+  listen: "127.0.0.1:8000"
+  maxBodyBytes: 33554432
+  readTimeout: 15m
+  requestTimeout: 2h
+  swaggerEnabled: false
+
+auth:
+  accessTokenTTL: 15m
+  refreshTokenTTL: 720h
+  secureCookies: false
+
+secrets:
+  jwtSecret: "60840a1cdfa87f8c6bb5bcb22df021062fbd38bb409ea28870dd5198f360dada"
+  credentialEncryptionKey: "XijSuHXwlbzzrBqBtgKRr48ycVzwHPB7EpjFDR3mmYE="
+
+bootstrapAdmin:
+  username: "admin"
+  password: "admin123"
+
+frontend:
+  staticPath: "./frontend/dist"
+
+database:
+  driver: sqlite
+  sqlite:
+    path: "./data/backend.db"
+
+runtimeStore:
+  driver: memory
+
+deployment:
+  replicas: 1
+  instanceID: ""
+  clusterID: "grok2api"
+  sharedMedia: false
+
+media:
+  driver: local
+  local:
+    path: "./data/media"
+
+routing:
+  reasoningReplayEnabled: true
+  reasoningReplayTTL: 1h
+  reasoningReplayMaxEntries: 10240
+  segmentedSelectorEnabled: false
+  segmentedSelectorMinCandidates: 3000
+  segmentedSelectorWindowSize: 64
+
+audit:
+  bufferSize: 16384
+  batchSize: 256
+  flushInterval: 250ms
+  commitDelay: 5ms
+  ledgerMode: enforce
+  ledgerFailureThreshold: 1
+  ledgerUnhealthyGrace: 10s
+  ledgerQueueHighWatermarkPercent: 90

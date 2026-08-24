@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat2API 控制台 - ChatGPT Web-to-API Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(16, 185, 129, 0.35);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --code-bg: #0d121f;
+    }
+
+    html.light {
+      --bg: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(0, 0, 0, 0.08);
+      --card-border-hover: rgba(16, 185, 129, 0.45);
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #059669;
+      --primary-hover: #047857;
+      --primary-glow: rgba(16, 185, 129, 0.15);
+      --accent: #4f46e5;
+      --accent-glow: rgba(79, 70, 229, 0.15);
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #059669;
+      --code-bg: #f1f5f9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 40%);
+      background-attachment: fixed;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0 28px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 28px;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .logo-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: var(--card-border);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--text-muted);
+    }
+
+    .btn-icon {
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .btn-icon:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Grid layout */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover {
+      border-color: var(--card-border-hover);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.15); }
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      background: rgba(16, 185, 129, 0.12);
+      font-weight: 600;
+    }
+    .tab-btn:hover:not(.active) {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Token Manager Section */
+    .token-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .token-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .textarea-wrapper {
+      position: relative;
+      margin: 12px 0 16px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 160px;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-glow);
+    }
+
+    .step-guide {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px dashed var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .step-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.5;
+    }
+
+    .step-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .token-info-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 12px;
+    }
+
+    .token-info-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .token-info-table td:first-child {
+      color: var(--text-muted);
+      width: 110px;
+      font-weight: 500;
+    }
+    .token-info-table td:last-child {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .model-tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: #a5b4fc;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      margin: 4px 4px 4px 0;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <div class="logo-icon">
+          <i data-lucide="zap"></i>
+        </div>
+        <div>
+          <div class="logo-title">
+            <span>Chat2API 控制台</span>
+            <span class="logo-badge">v1.0 Pro</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+            ChatGPT Web-to-API 官方协议逆向网关
+          </p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="/channels" class="btn btn-outline" title="回到 Dragon API 控制台">
+          <i data-lucide="layout-dashboard" style="width: 15px; height: 15px;"></i>
+          <span>Dragon API 控制台</span>
+        </a>
+        <a href="/chat2api/docs" target="_blank" class="btn btn-outline" title="查看 Swagger API 接口文档">
+          <i data-lucide="book-open" style="width: 15px; height: 15px;"></i>
+          <span>API 文档</span>
+        </a>
+        <button id="themeToggle" class="btn-icon" title="切换深色/浅色主题">
+          <i data-lucide="moon" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Overview Cards -->
+    <div class="overview-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="activity" style="width: 14px; height: 14px;"></i> 服务状态</span>
+          <span class="status-dot"></span>
+        </div>
+        <div class="card-value" style="color: var(--success);">
+          <span>运行中 (Online)</span>
+        </div>
+        <div class="card-desc">转发端口 :5005 | 协议网关正常</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="shield-check" style="width: 14px; height: 14px;"></i> 调度渠道绑定</span>
+          <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div class="card-value">
+          <span>ChatGPT-W2A</span>
+        </div>
+        <div class="card-desc">绑定渠道 ID #1, #2 | 负载均衡</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="clock" style="width: 14px; height: 14px;"></i> Token 时效监控</span>
+          <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div class="card-value" id="cardExpiryStatus" style="font-size: 18px;">
+          <span>检测中...</span>
+        </div>
+        <div class="card-desc" id="cardAccountEmail">OpenAI Plus 认证鉴权</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> 逆向模型支持</span>
+          <i data-lucide="layers" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div class="card-value" style="font-size: 18px; color: #a5b4fc;">
+          <span>5+ 模型族</span>
+        </div>
+        <div class="card-desc">GPT-4o, O1, O3, Mobile, GPTs</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('token')">
+        <i data-lucide="key-round" style="width: 14px; height: 14px;"></i>
+        <span>凭证维护 & 解析</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('models')">
+        <i data-lucide="box" style="width: 14px; height: 14px;"></i>
+        <span>可用模型列表</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('api')">
+        <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
+        <span>API 调用示例</span>
+      </button>
+    </div>
+
+    <!-- Tab 1: Token Management -->
+    <div id="tab-token" class="tab-content active">
+      <div class="token-panel">
+        <!-- Left: Paste Box -->
+        <div class="card">
+          <div class="card-header">
+            <h3 style="font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="clipboard-paste" style="width: 16px; height: 16px; color: var(--primary);"></i>
+              <span>粘贴 Session JSON / AccessToken</span>
+            </h3>
+            <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="pasteFromClipboard()">
+              <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+              <span>从剪贴板粘贴</span>
+            </button>
+          </div>
+
+          <div class="step-guide">
+            <div style="font-weight: 600; font-size: 12px; margin-bottom: 8px; color: var(--text); display: flex; justify-content: space-between; align-items: center;">
+              <span>💡 官方凭证提取指引</span>
+              <a href="https://chatgpt.com/api/auth/session" target="_blank" style="color: var(--primary); text-decoration: underline; font-size: 11px;">
+                打开 Session 链接 ↗
+              </a>
+            </div>
+            <ul class="step-list">
+              <li class="step-item">
+                <span class="step-num">1</span>
+                <span>在浏览器登录 <a href="https://chatgpt.com" target="_blank" style="color: var(--primary);">chatgpt.com</a> 并随便发一句话激活会话。</span>
+              </li>
+              <li class="step-item">
+                <span class="step-num">2</span>
+                <span>打开 <code>https://chatgpt.com/api/auth/session</code> 按 <b>Ctrl+A 全选并复制整个页面的 JSON</b>。</span>
+              </li>
+              <li class="step-item">
+                <span class="step-num">3</span>
+                <span>直接粘贴到下方输入框，系统自动提取 <code>accessToken</code> 并解析到期时间。</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="textarea-wrapper">
+            <textarea id="tokenInput" placeholder='可直接粘贴从 https://chatgpt.com/api/auth/session 复制的完整 JSON，或单独粘贴 AccessToken...' oninput="analyzePastedToken()"></textarea>
+          </div>
+
+          <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <a href="/channels" class="btn btn-primary">
+              <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+              <span>前往 Dragon API 渠道一键更新</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Right: Realtime Token Decode Preview -->
+        <div class="card">
+          <div class="card-header">
+            <h3 style="font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="sparkles" style="width: 16px; height: 16px; color: var(--accent);"></i>
+              <span>Token 实时解析看板</span>
+            </h3>
+            <span id="tokenStatusTag" class="logo-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted); border-color: var(--card-border);">
+              等待输入
+            </span>
+          </div>
+
+          <table class="token-info-table">
+            <tr>
+              <td>绑定账号</td>
+              <td id="infoEmail" style="color: var(--text-muted);">尚未解析</td>
+            </tr>
+            <tr>
+              <td>账号类型</td>
+              <td id="infoPlan" style="color: var(--text-muted);">尚未解析</td>
+            </tr>
+            <tr>
+              <td>到期时间</td>
+              <td id="infoExpiry" style="color: var(--text-muted);">尚未解析</td>
+            </tr>
+            <tr>
+              <td>剩余有效</td>
+              <td id="infoRemaining" style="color: var(--text-muted);">尚未解析</td>
+            </tr>
+            <tr>
+              <td>会话 ID</td>
+              <td id="infoSession" style="color: var(--text-muted); word-break: break-all;">尚未解析</td>
+            </tr>
+            <tr>
+              <td>Token 长度</td>
+              <td id="infoLength" style="color: var(--text-muted);">0 字符</td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 20px; padding: 14px; border-radius: 10px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+            <b style="color: #a5b4fc;">📌 提示：</b> 
+            OpenAI 官方 Web 端 AccessToken 的默认有效期通常为 <b>10 天</b>。请关注到期提醒，及时更新以保障线上 API 调用不中断。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Models -->
+    <div id="tab-models" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size: 15px; font-weight: 600;">已适配的 ChatGPT 逆向模型映射表</h3>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Chat2API 自动识别请求中的 <code>model</code> 参数，并路由至对应的官方 Web 接口：
+        </p>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
+          <span class="model-tag">gpt-4o</span>
+          <span class="model-tag">gpt-4o-mini</span>
+          <span class="model-tag">gpt-4-mobile</span>
+          <span class="model-tag">o1</span>
+          <span class="model-tag">o1-preview</span>
+          <span class="model-tag">o1-mini</span>
+          <span class="model-tag">o3-mini</span>
+          <span class="model-tag">text-davinci-002-render-sha (3.5)</span>
+          <span class="model-tag">gpt-4-gizmo-g-* (GPTs)</span>
+        </div>
+
+        <table class="token-info-table">
+          <thead>
+            <tr style="text-align: left; color: var(--text-muted);">
+              <th>模型名称</th>
+              <th>后端路由机制</th>
+              <th>特点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>gpt-4o</code> / <code>gpt-4-mobile</code></td>
+              <td>OpenAI 官方 Web GPT-4o 引擎</td>
+              <td>支持视觉识图、联网搜索与高级代码解释</td>
+            </tr>
+            <tr>
+              <td><code>o1-preview</code> / <code>o1-mini</code> / <code>o3-mini</code></td>
+              <td>OpenAI Reasoning 深度推理通道</td>
+              <td>具备思维链（Chain of Thought）深度逻辑推演</td>
+            </tr>
+            <tr>
+              <td><code>gpt-4-gizmo-g-*</code></td>
+              <td>自定义 GPTs 商店应用通道</td>
+              <td>直接传入 GPTs ID 即可调用专属智能体</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: API Integration -->
+    <div id="tab-api" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size: 15px; font-weight: 600;">标准 OpenAI API 调用规范</h3>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          可以通过 Dragon API 统一网关分发，也可以直接调用本服务的接口：
+        </p>
+
+        <div class="code-header">
+          <span>cURL 调用示例</span>
+          <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="copyCode('curlCode')">复制</button>
+        </div>
+        <pre id="curlCode">curl -X POST "https://api2.fanxiaolong.uk/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-YOUR_DRAGON_API_KEY" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [
+      {"role": "user", "content": "你好，请介绍一下你自己"}
+    ],
+    "stream": true
+  }'</pre>
+
+        <div class="code-header" style="margin-top: 16px;">
+          <span>Python OpenAI SDK 调用示例</span>
+          <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="copyCode('pyCode')">复制</button>
+        </div>
+        <pre id="pyCode">from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-YOUR_DRAGON_API_KEY",
+    base_url="https://api2.fanxiaolong.uk/v1"
+)
+
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Hello world!"}],
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")</pre>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">
+    <i data-lucide="check-circle-2" style="width: 16px; height: 16px; color: var(--primary);"></i>
+    <span id="toastMsg">操作成功</span>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // Theme Switcher
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+
+    const savedTheme = localStorage.getItem('chat2api_theme') || 'dark';
+    if (savedTheme === 'light') {
+      htmlEl.classList.remove('dark');
+      htmlEl.classList.add('light');
+    }
+
+    themeToggle.addEventListener('click', () => {
+      if (htmlEl.classList.contains('dark')) {
+        htmlEl.classList.remove('dark');
+        htmlEl.classList.add('light');
+        localStorage.setItem('chat2api_theme', 'light');
+      } else {
+        htmlEl.classList.remove('light');
+        htmlEl.classList.add('dark');
+        localStorage.setItem('chat2api_theme', 'dark');
+      }
+    });
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+      lucide.createIcons();
+    }
+
+    // Toast
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function copyCode(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text);
+      showToast('代码已复制到剪贴板！');
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          document.getElementById('tokenInput').value = text;
+          analyzePastedToken();
+          showToast('已从剪贴板粘贴！');
+        }
+      } catch {
+        showToast('请使用键盘快捷键 Ctrl+V / Cmd+V 粘贴');
+      }
+    }
+
+    // JWT / Session Extraction and Decoder
+    function extractToken(raw) {
+      if (!raw || typeof raw !== 'string') return '';
+      const text = raw.trim();
+
+      if (text.startsWith('{') && text.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && parsed.accessToken) return parsed.accessToken.trim();
+        } catch(e) {}
+      }
+
+      const jsonMatch = text.match(/"accessToken"\s*:\s*"([^"]+)"/);
+      if (jsonMatch && jsonMatch[1]) return jsonMatch[1].trim();
+
+      const jwtMatch = text.match(/eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/);
+      if (jwtMatch && jwtMatch[0]) return jwtMatch[0];
+
+      return text;
+    }
+
+    function parseJwt(token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length < 3) return null;
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function analyzePastedToken() {
+      const raw = document.getElementById('tokenInput').value;
+      const clean = extractToken(raw);
+
+      if (!clean) {
+        document.getElementById('tokenStatusTag').innerText = '等待输入';
+        document.getElementById('tokenStatusTag').style.background = 'rgba(255,255,255,0.05)';
+        document.getElementById('tokenStatusTag').style.color = 'var(--text-muted)';
+        document.getElementById('infoEmail').innerText = '尚未解析';
+        document.getElementById('infoPlan').innerText = '尚未解析';
+        document.getElementById('infoExpiry').innerText = '尚未解析';
+        document.getElementById('infoRemaining').innerText = '尚未解析';
+        document.getElementById('infoSession').innerText = '尚未解析';
+        document.getElementById('infoLength').innerText = '0 字符';
+        return;
+      }
+
+      document.getElementById('infoLength').innerText = clean.length + ' 字符';
+
+      const payload = parseJwt(clean);
+      if (!payload || !payload.exp) {
+        document.getElementById('tokenStatusTag').innerText = '非标准 JWT 凭证';
+        document.getElementById('tokenStatusTag').style.background = 'rgba(245, 158, 11, 0.15)';
+        document.getElementById('tokenStatusTag').style.color = 'var(--warning)';
+        return;
+      }
+
+      const expDate = new Date(payload.exp * 1000);
+      const now = new Date();
+      const diffMs = expDate - now;
+      const isExpired = diffMs <= 0;
+
+      const days = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+      const email = payload['https://api.openai.com/profile']?.email || payload.email || payload.preferred_username || 'OpenAI 账号';
+      const plan = payload['https://api.openai.com/auth']?.chatgpt_plan_type || 'Plus / Pro';
+      const session = payload.session_id || payload.sub || '-';
+
+      document.getElementById('infoEmail').innerText = email;
+      document.getElementById('infoPlan').innerText = plan.toUpperCase();
+      document.getElementById('infoExpiry').innerText = expDate.toLocaleString();
+      document.getElementById('infoSession').innerText = session;
+
+      if (isExpired) {
+        document.getElementById('tokenStatusTag').innerText = '已过期';
+        document.getElementById('tokenStatusTag').style.background = 'rgba(239, 68, 68, 0.15)';
+        document.getElementById('tokenStatusTag').style.color = 'var(--danger)';
+        document.getElementById('infoRemaining').innerHTML = `<span style="color: var(--danger);">已过期 ${days} 天 ${hours} 小时</span>`;
+      } else {
+        document.getElementById('tokenStatusTag').innerText = '有效凭证';
+        document.getElementById('tokenStatusTag').style.background = 'rgba(16, 185, 129, 0.15)';
+        document.getElementById('tokenStatusTag').style.color = 'var(--success)';
+        document.getElementById('infoRemaining').innerHTML = `<span style="color: var(--success);">剩余 ${days} 天 ${hours} 小时</span>`;
+      }
+    }
+
+    // Try fetching channel status on load
+    fetch('/api/status').then(r => r.json()).then(data => {
+      if (data && data.success) {
+        document.getElementById('cardExpiryStatus').innerHTML = `<span style="color: var(--success);">在线</span>`;
+      }
+    }).catch(() => {
+      document.getElementById('cardExpiryStatus').innerText = '在线中转';
+    });
+  </script>
+</body>
+</html>

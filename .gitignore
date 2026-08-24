@@ -1,43 +1,70 @@
-.idea
-.vscode
-.zed
-.history
-upload
-*.exe
+# 生产数据持久化目录
+postgres_data/
+redis_data/
+chat2api_data/
+data/
+/data/
+grok2api/data/
+dozzle_data/admin/
+
+# 运行日志与备份文件
+logs/
+backups/
+*.rdb
 *.db
-build
+*.log
 *.db-journal
-logs
-web/dist
-web/node_modules
+
+# 敏感环境变量与密钥
 .env
-one-api
+.env.local
+
+# Node & 前端构建产物
+node_modules/
+**/node_modules/
+web/dist/
+**/web/dist/
+web/node_modules/
+dist/
+**/dist/
+build/
+electron/node_modules/
+electron/dist/
+
+# 二进制文件与编译缓存
 new-api
+**/new-api
+one-api
+**/one-api
+*.exe
+*.test
 /__debug_bin*
-.DS_Store
 tiktoken_cache
 .eslintcache
 .gocache
 .gomodcache/
-.cache
-plans
-.claude
-.cursor
-
-electron/node_modules
-electron/dist
-/data/
-.gomodcache/
 .gocache-temp
 .gopath
-.test
-token_estimator_test.go
+.cache
+.local-tests/
+
+# IDE 与本地开发工具
+.idea
+.vscode
+.zed
+.history
+.claude
+.cursor
+upload
+plans
 skills-lock.json
 .playwright-mcp
-
-# Local-only live probes and scratch test workspaces.
-.local-tests/
+token_estimator_test.go
 service/relayconvert/chat_responses_live_local_test.go
 service/openaicompat/chat_responses_live_local_test.go
 go.work
 go.work.sum
+
+# 系统文件
+.DS_Store
+**/.DS_Store

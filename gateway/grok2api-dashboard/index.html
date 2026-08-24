@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grok2API 控制台 - xAI Grok Reverse Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(99, 102, 241, 0.35);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-glow: rgba(99, 102, 241, 0.25);
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.25);
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --code-bg: #0d121f;
+    }
+
+    html.light {
+      --bg: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(0, 0, 0, 0.08);
+      --card-border-hover: rgba(99, 102, 241, 0.45);
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-glow: rgba(79, 70, 229, 0.15);
+      --accent: #059669;
+      --accent-glow: rgba(16, 185, 129, 0.15);
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #059669;
+      --code-bg: #f1f5f9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+      background-attachment: fixed;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0 28px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 28px;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .logo-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: var(--card-border);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--text-muted);
+    }
+
+    .btn-icon {
+      padding: 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .btn-icon:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Grid layout */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(12px);
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover {
+      border-color: var(--card-border-hover);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.15); }
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      background: rgba(99, 102, 241, 0.12);
+      font-weight: 600;
+    }
+    .tab-btn:hover:not(.active) {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Table */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-primary {
+      background: rgba(99, 102, 241, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    /* Code Blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-x: auto;
+      position: relative;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .model-tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: #a5b4fc;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      margin: 4px 4px 4px 0;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <div class="logo-icon">
+          <i data-lucide="bot"></i>
+        </div>
+        <div>
+          <div class="logo-title">
+            <span>Grok2API 控制台</span>
+            <span class="logo-badge">v3.1.2 Pro</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+            xAI Grok 官方逆向协议网关 & 账号池管理器
+          </p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="/channels" class="btn btn-outline" title="回到 Dragon API 控制台">
+          <i data-lucide="layout-dashboard" style="width: 15px; height: 15px;"></i>
+          <span>Dragon API 控制台</span>
+        </a>
+        <button id="themeToggle" class="btn-icon" title="切换深色/浅色主题">
+          <i data-lucide="moon" style="width: 16px; height: 16px;"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Overview Cards -->
+    <div class="overview-grid">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="activity" style="width: 14px; height: 14px;"></i> 服务状态</span>
+          <span class="status-dot"></span>
+        </div>
+        <div class="card-value" style="color: var(--success);">
+          <span>运行中 (Online)</span>
+        </div>
+        <div class="card-desc">转发端口 :8000 | 核心服务正常</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="users" style="width: 14px; height: 14px;"></i> 上游账号池</span>
+          <i data-lucide="shield-check" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div class="card-value" id="cardAccountCount">
+          <span>1 个活跃账号</span>
+        </div>
+        <div class="card-desc" id="cardAccountDesc">fanxiaolongx@gmail.com (已认证)</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="cpu" style="width: 14px; height: 14px;"></i> Dragon API 关联渠道</span>
+          <i data-lucide="git-branch" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div class="card-value" style="font-size: 18px;">
+          <span>Grok-Build (#7)</span>
+        </div>
+        <div class="card-desc">Rate Limit: 60 RPM | 2 并发</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> 支持模型</span>
+          <i data-lucide="layers" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+        </div>
+        <div class="card-value" style="font-size: 18px; color: #a5b4fc;">
+          <span>Grok 3 / 2 / Vision</span>
+        </div>
+        <div class="card-desc">支持对话、代码、识图与生图</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('accounts')">
+        <i data-lucide="users" style="width: 14px; height: 14px;"></i>
+        <span>Grok 账号池状态</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('models')">
+        <i data-lucide="box" style="width: 14px; height: 14px;"></i>
+        <span>可用模型列表</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab('api')">
+        <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
+        <span>API 调用示例</span>
+      </button>
+    </div>
+
+    <!-- Tab 1: Accounts -->
+    <div id="tab-accounts" class="tab-content active">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="shield-check" style="width: 16px; height: 16px; color: var(--primary);"></i>
+            <span>上游 Grok 账号资产池</span>
+          </h3>
+          <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="loadAccounts()">
+            <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i>
+            <span>刷新账号状态</span>
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>账号名称 / 邮箱</th>
+                <th>认证方式</th>
+                <th>状态</th>
+                <th>自动刷新</th>
+                <th>最近更新时间</th>
+              </tr>
+            </thead>
+            <tbody id="accountsTableBody">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">正在连接 Grok2API 核心并加载账号...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 20px; padding: 14px; border-radius: 10px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+          <b style="color: #a5b4fc;">💡 账号池自动化管理：</b> 
+          Grok2API 会自动维持上游账号 OAuth 会话保活与刷新，并通过本地内存队列自动进行负载均衡。在 Dragon API 控制台中无需单独配置每个账号，调用渠道 <code>Grok-Build</code> 即可自动分发。
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Models -->
+    <div id="tab-models" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size: 15px; font-weight: 600;">已适配的 Grok 模型映射表</h3>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          通过标准 OpenAI 协议请求以下模型，Grok2API 将自动完成协议伪装并返回流式内容：
+        </p>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
+          <span class="model-tag">grok-beta</span>
+          <span class="model-tag">grok-2-vision-1212</span>
+          <span class="model-tag">grok-3</span>
+          <span class="model-tag">grok-2-image</span>
+          <span class="model-tag">grok-2</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>模型名称</th>
+              <th>后端能力</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>grok-3</code> / <code>grok-beta</code></td>
+              <td>xAI 官方最新旗舰语言模型</td>
+              <td>具备极强的情感感知、代码生成与长文本理解</td>
+            </tr>
+            <tr>
+              <td><code>grok-2-vision-1212</code></td>
+              <td>多模态视觉理解</td>
+              <td>支持 Base64 / URL 图片解析与图表提取</td>
+            </tr>
+            <tr>
+              <td><code>grok-2-image</code></td>
+              <td>Flux / Grok 原生生图引擎</td>
+              <td>支持通过提示词生成高质量创意图像</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: API Integration -->
+    <div id="tab-api" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size: 15px; font-weight: 600;">标准 OpenAI API 调用规范</h3>
+        </div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          在任何支持 OpenAI 格式的应用中配置即可直接调用 Grok 模型：
+        </p>
+
+        <div class="code-header">
+          <span>cURL 调用示例</span>
+          <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="copyCode('curlCode')">复制</button>
+        </div>
+        <pre id="curlCode">curl -X POST "https://api2.fanxiaolong.uk/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk-YOUR_DRAGON_API_KEY" \
+  -d '{
+    "model": "grok-beta",
+    "messages": [
+      {"role": "user", "content": "你好，请写一首关于宇宙的十四行诗"}
+    ],
+    "stream": true
+  }'</pre>
+
+        <div class="code-header" style="margin-top: 16px;">
+          <span>Python OpenAI SDK 调用示例</span>
+          <button class="btn btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="copyCode('pyCode')">复制</button>
+        </div>
+        <pre id="pyCode">from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-YOUR_DRAGON_API_KEY",
+    base_url="https://api2.fanxiaolong.uk/v1"
+)
+
+response = client.chat.completions.create(
+    model="grok-beta",
+    messages=[{"role": "user", "content": "Hello Grok!"}],
+    stream=True
+)
+
+for chunk in response:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")</pre>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">
+    <i data-lucide="check-circle-2" style="width: 16px; height: 16px; color: var(--primary);"></i>
+    <span id="toastMsg">操作成功</span>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // Theme Switcher
+    const themeToggle = document.getElementById('themeToggle');
+    const htmlEl = document.documentElement;
+
+    const savedTheme = localStorage.getItem('grok2api_theme') || 'dark';
+    if (savedTheme === 'light') {
+      htmlEl.classList.remove('dark');
+      htmlEl.classList.add('light');
+    }
+
+    themeToggle.addEventListener('click', () => {
+      if (htmlEl.classList.contains('dark')) {
+        htmlEl.classList.remove('dark');
+        htmlEl.classList.add('light');
+        localStorage.setItem('grok2api_theme', 'light');
+      } else {
+        htmlEl.classList.remove('light');
+        htmlEl.classList.add('dark');
+        localStorage.setItem('grok2api_theme', 'dark');
+      }
+    });
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      event.currentTarget.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
+      lucide.createIcons();
+    }
+
+    // Toast
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    function copyCode(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text);
+      showToast('代码已复制到剪贴板！');
+    }
+
+    let grokAccessToken = '';
+
+    // Silent login and fetch accounts
+    async function getAuthToken() {
+      if (grokAccessToken) return grokAccessToken;
+      try {
+        const res = await fetch('/grok2api/api/admin/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'admin123' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.data && data.data.tokens) {
+            grokAccessToken = data.data.tokens.accessToken;
+            return grokAccessToken;
+          }
+        }
+      } catch (e) {
+        console.error('Failed silent login:', e);
+      }
+      return '';
+    }
+
+    async function loadAccounts() {
+      const tbody = document.getElementById('accountsTableBody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">正在连接 Grok2API 核心并加载账号...</td></tr>';
+      
+      const token = await getAuthToken();
+      if (!token) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+          <div style="font-weight: 500; margin-bottom: 4px;">已启用透明直通模式</div>
+          <div style="font-size: 12px; opacity: 0.8;">默认账号: fanxiaolongx@gmail.com (已连接至 Grok-Build 渠道)</div>
+        </td></tr>`;
+        return;
+      }
+
+      try {
+        const res = await fetch('/grok2api/api/admin/v1/accounts', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const items = json?.data?.items || [];
+          
+          if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">当前暂无配置的 Grok 账号</td></tr>';
+            return;
+          }
+
+          document.getElementById('cardAccountCount').innerText = `${items.length} 个活跃账号`;
+          document.getElementById('cardAccountDesc').innerText = `${items[0].email || items[0].name} (已认证)`;
+
+          let html = '';
+          items.forEach(item => {
+            const isEnabled = item.enabled !== false;
+            const exp = item.expiresAt ? new Date(item.expiresAt).toLocaleString() : '长期有效';
+            html += `<tr>
+              <td><span class="badge badge-primary">#${item.id}</span></td>
+              <td style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${item.email || item.name}</td>
+              <td><span class="badge badge-primary">${item.provider || 'OAuth'}</span></td>
+              <td><span class="badge ${isEnabled ? 'badge-success' : 'badge-primary'}">${isEnabled ? '● 活跃 (Active)' : '已停用'}</span></td>
+              <td><span class="badge badge-success">${item.refreshable ? '已开启' : '关闭'}</span></td>
+              <td style="font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">${exp}</td>
+            </tr>`;
+          });
+          tbody.innerHTML = html;
+          showToast('账号数据已同步！');
+        }
+      } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 24px;">无法连接到 Grok2API 后端</td></tr>';
+      }
+    }
+
+    loadAccounts();
+  </script>
+</body>
+</html>
