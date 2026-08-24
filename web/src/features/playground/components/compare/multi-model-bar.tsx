@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useMemo } from 'react'
 import {
   BotIcon,
   Columns2Icon,
@@ -38,11 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { sortAndGroupModels } from '@/components/model-group-selector'
 import { cn } from '@/lib/utils'
 
 import type { ModelOption, PlaygroundConfig } from '../../types'
@@ -87,6 +84,11 @@ export function MultiModelBar({
   const compareModels = config.compareModels && config.compareModels.length > 0
     ? config.compareModels
     : [config.model || 'gpt-4o', 'gemini-3.1-pro']
+
+  const categorizedGroups = useMemo(
+    () => sortAndGroupModels(models),
+    [models]
+  )
 
   const handleToggleMode = (mode: 'single' | 'compare') => {
     onConfigChange('mode', mode)
@@ -238,28 +240,34 @@ export function MultiModelBar({
                   </DropdownMenuTrigger>
 
                   <DropdownMenuContent align='start' className='max-h-72 w-56 overflow-y-auto'>
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
-                        {t('Replace with model')}
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {models.map((m) => (
-                        <DropdownMenuItem
-                          key={m.value}
-                          disabled={compareModels.includes(m.value) && m.value !== modelName}
-                          onClick={() => handleReplaceModel(index, m.value)}
-                          className='text-xs font-mono'
-                        >
-                          <BotIcon className='mr-2 size-3.5' />
-                          <span className='truncate'>{m.label || m.value}</span>
-                          {m.value === modelName && (
-                            <span className='ml-auto text-[10px] text-muted-foreground'>
-                              ({t('Current')})
-                            </span>
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
+                    <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
+                      {t('Replace with model')}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {categorizedGroups.map(({ category, models: categoryModels }) => (
+                      <DropdownMenuGroup key={category}>
+                        <div className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1'>
+                          {category}
+                        </div>
+                        {categoryModels.map((m) => (
+                          <DropdownMenuItem
+                            key={m.value}
+                            disabled={compareModels.includes(m.value) && m.value !== modelName}
+                            onClick={() => handleReplaceModel(index, m.value)}
+                            className='text-xs font-mono'
+                          >
+                            <BotIcon className='mr-2 size-3.5' />
+                            <span className='truncate'>{m.label || m.value}</span>
+                            {m.value === modelName && (
+                              <span className='ml-auto text-[10px] text-muted-foreground'>
+                                ({t('Current')})
+                              </span>
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                      </DropdownMenuGroup>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )
@@ -284,24 +292,34 @@ export function MultiModelBar({
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align='end' className='max-h-72 w-56 overflow-y-auto'>
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
-                    {t('Select model to add')}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {models
-                    .filter((m) => !compareModels.includes(m.value))
-                    .map((m) => (
-                      <DropdownMenuItem
-                        key={m.value}
-                        onClick={() => handleAddModel(m.value)}
-                        className='text-xs font-mono'
-                      >
-                        <BotIcon className='mr-2 size-3.5' />
-                        <span className='truncate'>{m.label || m.value}</span>
-                      </DropdownMenuItem>
-                    ))}
-                </DropdownMenuGroup>
+                <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
+                  {t('Select model to add')}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {categorizedGroups
+                  .map(({ category, models: categoryModels }) => ({
+                    category,
+                    models: categoryModels.filter((m) => !compareModels.includes(m.value)),
+                  }))
+                  .filter((g) => g.models.length > 0)
+                  .map(({ category, models: categoryModels }) => (
+                    <DropdownMenuGroup key={category}>
+                      <div className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1'>
+                        {category}
+                      </div>
+                      {categoryModels.map((m) => (
+                        <DropdownMenuItem
+                          key={m.value}
+                          onClick={() => handleAddModel(m.value)}
+                          className='text-xs font-mono'
+                        >
+                          <BotIcon className='mr-2 size-3.5' />
+                          <span className='truncate'>{m.label || m.value}</span>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                    </DropdownMenuGroup>
+                  ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

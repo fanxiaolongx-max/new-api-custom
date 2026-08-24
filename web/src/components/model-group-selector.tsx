@@ -62,24 +62,123 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
+import { getModelCategory } from '@/features/channels/lib/model-categories'
+
 import {
   modelGroupSelectorLayoutClasses,
   scrollSelectedOptionIntoView,
 } from './model-group-selector/layout'
 
-interface ModelOption {
+export interface ModelOption {
   label: string
   value: string
   category?: string
   description?: string
 }
 
-interface GroupOption {
+export interface GroupOption {
   label: string
   value: string
   ratio?: number
   desc?: string
   description?: string
+}
+
+const CATEGORY_PRIORITY: Record<string, number> = {
+  OpenAI: 1,
+  Anthropic: 2,
+  Gemini: 3,
+  xAI: 4,
+  DeepSeek: 5,
+  Qwen: 6,
+  Wan: 7,
+  Moonshot: 8,
+  MiniMax: 9,
+  Doubao: 10,
+  Zhipu: 11,
+  Baidu: 12,
+  Yi: 13,
+  iFlytek: 14,
+  Tencent: 15,
+  Baichuan: 16,
+  InternLM: 17,
+  StepFun: 18,
+  MiMo: 19,
+  Mistral: 20,
+  Meta: 21,
+  Perplexity: 22,
+  NVIDIA: 23,
+  Cohere: 24,
+  Jina: 25,
+  BAAI: 26,
+  'Black Forest Labs': 27,
+  Microsoft: 28,
+  Amazon: 29,
+  'AI21 Labs': 30,
+  'Stability AI': 31,
+  'Nous Research': 32,
+  '360 AI': 33,
+  Midjourney: 34,
+  Kling: 35,
+  Vidu: 36,
+  Suno: 37,
+  Jimeng: 38,
+  Other: 999,
+}
+
+export function sortAndGroupModels(
+  models: ModelOption[],
+  searchQuery: string = ''
+): Array<{ category: string; models: ModelOption[] }> {
+  const query = searchQuery.trim().toLowerCase()
+
+  const categorizedMap: Record<string, ModelOption[]> = {}
+
+  for (const model of models) {
+    const category =
+      model.category || getModelCategory(model.value || model.label)
+    if (query) {
+      const searchableText = [
+        model.label,
+        model.value,
+        model.description || '',
+        category,
+      ]
+        .join(' ')
+        .toLowerCase()
+      if (!searchableText.includes(query)) {
+        continue
+      }
+    }
+
+    categorizedMap[category] ??= []
+    categorizedMap[category].push({
+      ...model,
+      category,
+    })
+  }
+
+  const sortedCategories = Object.keys(categorizedMap).sort((a, b) => {
+    const priorityA = CATEGORY_PRIORITY[a] ?? 100
+    const priorityB = CATEGORY_PRIORITY[b] ?? 100
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB
+    }
+    return a.localeCompare(b)
+  })
+
+  return sortedCategories.map((category) => {
+    const sortedModels = categorizedMap[category].slice().sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    )
+    return {
+      category,
+      models: sortedModels,
+    }
+  })
 }
 
 interface ModelSelectorProps {
@@ -186,44 +285,15 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
       [models, selectedModel]
     )
 
-    // Group models by category
-    const groupedModels = useMemo(
-      () =>
-        models.reduce(
-          (acc, model) => {
-            const category = model.category || t('Other')
-            if (!acc[category]) {
-              acc[category] = []
-            }
-            acc[category].push(model)
-            return acc
-          },
-          {} as Record<string, ModelOption[]>
-        ),
-      [models, t]
+    const categorizedGroups = useMemo(
+      () => sortAndGroupModels(models, searchQuery),
+      [models, searchQuery]
     )
 
-    // Filter models by search query
-    const filteredModels = useMemo(() => {
-      if (!searchQuery.trim()) return groupedModels
-
-      const query = searchQuery.toLowerCase()
-      const filtered: Record<string, ModelOption[]> = {}
-
-      Object.entries(groupedModels).forEach(([category, categoryModels]) => {
-        const matches = categoryModels.filter(
-          (m) =>
-            m.label.toLowerCase().includes(query) ||
-            m.value.toLowerCase().includes(query) ||
-            m.description?.toLowerCase().includes(query)
-        )
-        if (matches.length > 0) {
-          filtered[category] = matches
-        }
-      })
-
-      return filtered
-    }, [groupedModels, searchQuery])
+    const totalFilteredCount = useMemo(
+      () => categorizedGroups.reduce((acc, g) => acc + g.models.length, 0),
+      [categorizedGroups]
+    )
 
     const handleModelChange = useCallback(
       (value: string) => {
@@ -257,24 +327,27 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
         <CommandList
           className={isMobile ? '!max-h-full flex-1 p-2' : 'max-h-[300px]'}
         >
-          {Object.keys(filteredModels).length === 0 ? (
+          {totalFilteredCount === 0 ? (
             <div className='text-muted-foreground px-3 py-6 text-xs'>
               {t('No model found.')}
             </div>
           ) : (
-            Object.entries(filteredModels).map(
-              ([category, categoryModels], categoryIndex) => (
+            categorizedGroups.map(
+              ({ category, models: categoryModels }, categoryIndex) => (
                 <CommandGroup key={category}>
                   {categoryIndex > 0 && (
-                    <div className='border-border my-1 border-t' />
+                    <div className='border-border/60 my-1 border-t' />
                   )}
                   <div
                     className={cn(
-                      'text-muted-foreground px-2 py-1 font-medium',
+                      'text-muted-foreground flex items-center justify-between px-2 py-1 font-semibold tracking-wider uppercase',
                       isMobile ? 'text-xs' : 'text-[10px]'
                     )}
                   >
-                    {t('{{category}} Models', { category })}
+                    <span>{category}</span>
+                    <span className='font-mono text-[9px] opacity-60'>
+                      {categoryModels.length}
+                    </span>
                   </div>
                   {categoryModels.map((model) => (
                     <CommandItem
@@ -600,25 +673,15 @@ export const ModelGroupSelector: React.FC<ModelGroupSelectorProps> = ({
     () => groups.find((group) => group.value === selectedGroup),
     [groups, selectedGroup]
   )
-  const filteredModels = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) {
-      return models
-    }
+  const categorizedGroups = useMemo(
+    () => sortAndGroupModels(models, searchQuery),
+    [models, searchQuery]
+  )
 
-    return models.filter((model) => {
-      const searchableText = [
-        model.label,
-        model.value,
-        model.description || '',
-        model.category || '',
-      ]
-        .join(' ')
-        .toLowerCase()
-
-      return searchableText.includes(query)
-    })
-  }, [models, searchQuery])
+  const totalFilteredCount = useMemo(
+    () => categorizedGroups.reduce((acc, g) => acc + g.models.length, 0),
+    [categorizedGroups]
+  )
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -753,48 +816,63 @@ export const ModelGroupSelector: React.FC<ModelGroupSelectorProps> = ({
           isMobile ? 'max-h-[45vh]' : modelGroupSelectorLayoutClasses.modelList
         }
       >
-        {filteredModels.length === 0 ? (
+        {totalFilteredCount === 0 ? (
           <div className='text-muted-foreground px-3 py-8 text-center text-[12px] leading-5'>
             {t('No model found.')}
           </div>
         ) : (
-          <CommandGroup className='p-1'>
-            {filteredModels.map((model) => (
-              <CommandItem
-                className={cn(
-                  modelGroupSelectorLayoutClasses.modelItem,
-                  selectedModel === model.value
-                    ? modelGroupSelectorLayoutClasses.selectedModelItem
-                    : modelGroupSelectorLayoutClasses.unselectedModelItem
+          categorizedGroups.map(
+            ({ category, models: categoryModels }, groupIndex) => (
+              <CommandGroup key={category} className='p-1'>
+                {groupIndex > 0 && (
+                  <div className='border-border/60 my-1 border-t' />
                 )}
-                key={model.value}
-                onSelect={handleModelChange}
-                ref={
-                  selectedModel === model.value
-                    ? selectedModelOptionRef
-                    : undefined
-                }
-                value={model.value}
-              >
-                <span
-                  className={cn(
-                    'min-w-0 truncate',
-                    selectedModel === model.value
-                      ? modelGroupSelectorLayoutClasses.selectedModelText
-                      : modelGroupSelectorLayoutClasses.unselectedModelText
-                  )}
-                >
-                  {model.label}
-                </span>
-                <Check
-                  className={cn(
-                    'size-3.5 shrink-0',
-                    selectedModel === model.value ? 'opacity-100' : 'opacity-0'
-                  )}
-                />
-              </CommandItem>
-            ))}
-          </CommandGroup>
+                <div className='text-muted-foreground flex items-center justify-between px-2 py-1 text-[10px] font-semibold tracking-wider uppercase'>
+                  <span>{category}</span>
+                  <span className='font-mono text-[9px] opacity-60'>
+                    {categoryModels.length}
+                  </span>
+                </div>
+                {categoryModels.map((model) => (
+                  <CommandItem
+                    className={cn(
+                      modelGroupSelectorLayoutClasses.modelItem,
+                      selectedModel === model.value
+                        ? modelGroupSelectorLayoutClasses.selectedModelItem
+                        : modelGroupSelectorLayoutClasses.unselectedModelItem
+                    )}
+                    key={model.value}
+                    onSelect={handleModelChange}
+                    ref={
+                      selectedModel === model.value
+                        ? selectedModelOptionRef
+                        : undefined
+                    }
+                    value={model.value}
+                  >
+                    <span
+                      className={cn(
+                        'min-w-0 truncate',
+                        selectedModel === model.value
+                          ? modelGroupSelectorLayoutClasses.selectedModelText
+                          : modelGroupSelectorLayoutClasses.unselectedModelText
+                      )}
+                    >
+                      {model.label}
+                    </span>
+                    <Check
+                      className={cn(
+                        'size-3.5 shrink-0',
+                        selectedModel === model.value
+                          ? 'opacity-100'
+                          : 'opacity-0'
+                      )}
+                    />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )
+          )
         )}
       </CommandList>
     </Command>
