@@ -44,6 +44,7 @@
 </p>
 
 <p align="center">
+  <a href="#-定制增强特性">定制特性</a> •
   <a href="#-快速开始">快速开始</a> •
   <a href="#-主要特性">主要特性</a> •
   <a href="#-部署">部署</a> •
@@ -60,6 +61,40 @@
 > - 使用者必须合法取得上游 API Key、账号、模型服务或接口权限，并遵守上游服务条款及适用法律法规。
 > - 使用者应确保其使用方式符合上游服务条款及适用法律法规。
 > - 面向公众提供生成式人工智能服务时，使用者应遵守[《生成式人工智能服务管理暂行办法》](http://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm)等监管要求，自行完成所在司法辖区要求的备案、许可、内容安全、实名、日志留存、税务和上游授权等合规义务。
+
+---
+
+## 🌟 定制增强特性
+
+本项目在开源 [New API](https://github.com/QuantumNous/new-api) 优秀架构的基础上，针对生产环境运维、多微服务协同与交互体验进行了深度定制与二次开发：
+
+### 🥊 1. 多模型流式竞技场 (Arena Side-by-Side Comparison)
+* **并行对比推理**：Playground 控制台支持自由选择 2~4 个不同模型开展侧边栏双栏/多栏实时并行流式对比，直观测评不同模型的生成速度、质量与首字延迟。
+* **模型智能分组与切换**：模型选择列表按供应商（OpenAI、Anthropic Claude、Google Gemini、DeepSeek 等）进行结构化分组排序，支持在竞技场中直接点击模型 Badge 徽章无缝换模。
+* **完整多模态交互**：原生支持图片附件上传与分析，支持 AI 绘图结果渲染以及 Base64 Markdown 图片一键放大预览弹窗。
+* **联网搜索自由开关**：支持针对特定模型独立开启/关闭 Web Search 联网搜索能力。
+
+### 📊 2. 主机性能与多磁盘监控看板 (Host Metrics & Multi-Disk)
+* **实时系统性能指标**：控制台概览页原生卡片实时监控物理宿主机的 CPU 使用率、物理内存利用率以及 1m / 5m / 15m 系统平均负载。
+* **多挂载点磁盘容量扫描**：打破单磁盘限制，支持多挂载点磁盘自动扫描与可视化，不仅监测根分区 `/`，还深度支持独立挂载数据盘（如 `/mnt/data` 等挂载点）的容量、已用空间与可用率。
+
+### 🌡️ 3. 硬件热传感器实时监控 (Hardware Thermal Sensors)
+* **智能去重与友好命名**：自动扫描 `/sys/class/hwmon` 与 `/sys/class/thermal`，对多路重复传感器进行智能去重，并匹配友好的中文硬件名称（如 CPU 核心、主板、NVMe 固态等）。
+* **无损采样与时区自适应**：采集高精度温度指标，支持客户端浏览器本地时区自适应转换，历史趋势清晰直观。
+
+### 🔐 4. Nginx 统一网关与微服务免密单点登录 (SSO)
+* **一体化反代网关**：内置生产级 Nginx 网关配置（`gateway/nginx.conf`），统一对外暴露服务端口并实现流量收敛。
+* **Dozzle 实时日志免密 SSO**：基于 Redis Session Bridge 与 Nginx `auth_request /_logs_auth` 机制，管理人员访问 `/logs` 查看容器实时日志时自动验证 New API 管理员身份（`/api/user/auth/logs-sso`），非管理员或未登录自动拦截。
+* **多微服务无缝挂载**：统一根 Cookie 鉴权下无缝集成 `/chat2api/` 与 `/grok2api/` 转接服务及可视化独立控制台，New API 侧边栏与仪表盘原生内置快捷导航。
+
+### ⏳ 5. 渠道凭据到期监控与便捷维护 (Channel Expiry & Ops)
+* **Token 到期预警横幅**：控制台首页自动探测渠道 Access Token 到期时间，针对临期或过期凭据弹出全局醒目提醒横幅，并支持一键弹窗快捷更新。
+* **Session JSON 智能提取**：渠道新建/编辑支持直接粘贴上游完整的 Session JSON 数据，系统自动智能解析并提取对应的 Access Token。
+* **后台僵死实例自动清理**：内置后台守护任务，定期扫描并自动清理已废弃或销毁的历史实例与临时资源。
+
+### 💳 6. Stripe 订阅支付回调与安全加固
+* **并发结算加固**：重构并加固 Stripe 订阅支付回调链路，优化充值金额清空逻辑与并发状态结算，防止高并发回调下的数据不一致。
+
 
 ---
 
@@ -108,7 +143,41 @@
 
 ## 🚀 快速开始
 
-### 使用 Docker Compose（推荐）
+### 方式 1：使用本仓库一键 DevOps 运维栈（推荐生产运行）
+
+本项目内置了完整的容器编排（包含 PostgreSQL、Redis、Nginx 统一网关、chat2api、grok2api 及 Dozzle 日志系统）与全自动运维脚本：
+
+```bash
+# 1. 克隆定制仓库
+git clone https://github.com/fanxiaolongx-max/new-api-custom.git
+cd new-api-custom
+
+# 2. 根据实际环境配置参数（数据库、Redis、密钥与域名绑定）
+nano docker-compose.yml
+
+# 3. 运行自动化部署脚本（自动构建 Bun 前端、编译容器镜像并启动服务，自动回收构建缓存）
+bash deploy.sh
+```
+
+<details>
+<summary><strong>查看统一微服务架构拓扑与挂载说明</strong></summary>
+
+| 容器服务 | 镜像 / 构建源 | 职责说明 | 外部访问 / 路由 |
+|:---|:---|:---|:---|
+| **gateway** | `nginx:1.29-alpine` | 统一反向代理网关，负责流量分发、静态资源代理与 SSO 鉴权拦截 | `http://<IP>:3000/` |
+| **new-api** | 本地 Dockerfile 构建 | 核心大模型 API 网关，多模型调度、计量计费与硬件监控 | 内部 `3000` |
+| **postgres** | `postgres:15` | 关系型数据库，存储用户、渠道、日志与计费数据 | 内部 `5432` |
+| **redis** | `redis:alpine` | 分布式缓存与 Session 状态管理，支持多实例即时收敛 | 内部 `6379` |
+| **chat2api** | `lanqian528/chat2api` | ChatGPT 接口转接服务 | `/chat2api/` |
+| **grok2api** | `ghcr.io/chenyme/grok2api` | Grok 接口转接服务与独立管理控制台 | `/grok2api/` |
+| **dozzle** | `amir20/dozzle` | 容器实时日志查看器（由 `/_logs_auth` 提供免密单点登录保护） | `/logs` |
+
+> **💡 磁盘与硬件监控说明：**
+> `docker-compose.yml` 中默认通过只读挂载了宿主机的 `/mnt/data:/mnt/data:ro`、`/sys/class/hwmon:/sys/class/hwmon:ro` 和 `/sys/class/thermal:/sys/class/thermal:ro`，以无侵入方式采集物理机温度与多磁盘空间。若您的服务器挂载路径不同，可在 `docker-compose.yml` 中调整对应挂载点。
+
+</details>
+
+### 方式 2：使用标准 Docker Compose 运行基础版
 
 ```bash
 # 克隆项目
@@ -123,7 +192,7 @@ docker-compose up -d
 ```
 
 <details>
-<summary><strong>使用 Docker 命令</strong></summary>
+<summary><strong>使用 Docker 命令行运行</strong></summary>
 
 ```bash
 # 拉取最新镜像

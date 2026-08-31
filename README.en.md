@@ -45,6 +45,7 @@
 </p>
 
 <p align="center">
+  <a href="#-custom-features">Custom Features</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-key-features">Key Features</a> •
   <a href="#-deployment">Deployment</a> •
@@ -64,6 +65,40 @@
 > - Users must lawfully obtain upstream API keys, accounts, model services, and interface permissions, and must comply with upstream terms of service and applicable laws and regulations.
 > - Users should ensure their use complies with upstream terms of service and applicable laws and regulations.
 > - When providing generative AI services to the public, users should comply with applicable regulatory requirements and fulfill all filing, licensing, content safety, real-name verification, log retention, tax, and upstream authorization obligations required by their jurisdiction.
+
+---
+
+## 🌟 Custom Features
+
+Built upon the high-performance architecture of [New API](https://github.com/QuantumNous/new-api), this customized distribution introduces enterprise-grade DevOps automation, system observability, and advanced interactive capabilities:
+
+### 🥊 1. Multi-Model Arena & Side-by-Side Comparison
+* **Parallel Streaming Comparison**: The Playground console allows selecting 2 to 4 models simultaneously for side-by-side real-time streaming inference. Compare latency, response quality, and throughput side-by-side.
+* **Smart Provider Grouping & Badge Switching**: The model selector categorizes models by provider (OpenAI, Anthropic Claude, Google Gemini, DeepSeek, etc.). In Arena mode, click directly on any model badge to switch models without losing session context.
+* **Full Multimodal Experience**: Native image and file attachment uploading, AI image generation rendering, and one-click zoomed preview dialog for Base64 Markdown images.
+* **Web Search Toggle**: Granular toggle to enable or disable web search tool calls per model.
+
+### 📊 2. Real-Time Host Metrics & Multi-Disk Observability
+* **System Telemetry Panel**: The overview dashboard features a real-time host metrics card displaying physical host CPU utilization, RAM usage, and 1m/5m/15m system load averages.
+* **Multi-Mountpoint Disk Scanning**: Automatically scans and displays storage health across multiple filesystems — monitoring not only root `/` but also dedicated data partitions such as `/mnt/data`.
+
+### 🌡️ 3. Hardware Thermal Monitoring
+* **Smart Sensor Deduplication & Descriptive Naming**: Automatically inspects `/sys/class/hwmon` and `/sys/class/thermal`, deduplicating redundant entries and providing intuitive localized sensor labels (CPU cores, motherboard, NVMe drives).
+* **Lossless History & Local Timezone Conversion**: High-precision thermal metrics with client-side browser timezone normalization.
+
+### 🔐 4. Unified Gateway & Multi-Service SSO
+* **Integrated Nginx Gateway**: Production-ready Nginx configuration (`gateway/nginx.conf`) unifying routing and SSL termination on port 3000/80.
+* **Passwordless Dozzle Container Logs SSO**: Backed by a Redis Session Bridge and Nginx `auth_request /_logs_auth`, administrators seamlessly access container logs at `/logs` via `/api/user/auth/logs-sso` without separate credentials.
+* **Microservice Integration**: Unified root-cookie authentication for `/chat2api/` and `/grok2api/` proxies and dashboards, with native quick links in the New API admin navigation sidebar.
+
+### ⏳ 5. Channel Credential Expiry Monitoring & Ops Automation
+* **Access Token Expiry Banner**: The dashboard proactively detects upstream channel token expiration dates, displaying a global alert banner with a one-click quick-update modal.
+* **Session JSON Auto-Extraction**: When adding or configuring channels, simply paste the full upstream session JSON — the system automatically parses and extracts the relevant Access Token.
+* **Automated Instance Hygiene**: Built-in background daemon periodically scans and reclaims resources from abandoned or destroyed instances.
+
+### 💳 6. Stripe Subscription & Concurrency Hardening
+* **Reliable Settlement**: Hardened Stripe webhook handlers and balance synchronization to prevent race conditions during high-concurrency top-ups.
+
 
 ---
 
@@ -109,10 +144,44 @@
 
 ## 🚀 Quick Start
 
-### Using Docker Compose (Recommended)
+### Method 1: Automated DevOps Deployment Stack (Recommended for Production)
+
+This repository includes a turnkey Docker Compose stack (including PostgreSQL, Redis, Nginx Gateway, chat2api, grok2api, and Dozzle log viewer) and an automated build/deployment script:
 
 ```bash
-# Clone the project
+# 1. Clone this customized repository
+git clone https://github.com/fanxiaolongx-max/new-api-custom.git
+cd new-api-custom
+
+# 2. Configure environment variables (Database, Redis, secrets, and domain names)
+nano docker-compose.yml
+
+# 3. Execute the automated deployment script (Builds Bun frontend, compiles Docker image, reloads containers, and prunes build cache)
+bash deploy.sh
+```
+
+<details>
+<summary><strong>View Microservice Architecture & Host Mounts</strong></summary>
+
+| Service | Image / Source | Role | Port / Routing |
+|:---|:---|:---|:---|
+| **gateway** | `nginx:1.29-alpine` | Reverse proxy gateway handling traffic routing, static assets, and SSO verification | `http://<IP>:3000/` |
+| **new-api** | Local Dockerfile build | Core AI API gateway, quota accounting, intelligent load balancing & metrics | Internal `3000` |
+| **postgres** | `postgres:15` | Relational database for users, channels, logs, and billing | Internal `5432` |
+| **redis** | `redis:alpine` | Distributed cache, rate limiter, and centralized session bridge | Internal `6379` |
+| **chat2api** | `lanqian528/chat2api` | ChatGPT upstream proxy service | `/chat2api/` |
+| **grok2api** | `ghcr.io/chenyme/grok2api` | Grok upstream proxy service and web dashboard | `/grok2api/` |
+| **dozzle** | `amir20/dozzle` | Real-time container log viewer (protected by `/_logs_auth` SSO) | `/logs` |
+
+> **💡 Host Telemetry Mounts:**
+> `docker-compose.yml` mounts host paths in read-only mode (`/mnt/data:/mnt/data:ro`, `/sys/class/hwmon:/sys/class/hwmon:ro`, and `/sys/class/thermal:/sys/class/thermal:ro`), allowing non-intrusive collection of host disk capacity and thermal sensor metrics. Adjust mount paths in `docker-compose.yml` if your storage partitions differ.
+
+</details>
+
+### Method 2: Standard Docker Compose (Standalone)
+
+```bash
+# Clone the upstream project
 git clone https://github.com/QuantumNous/new-api.git
 cd new-api
 
