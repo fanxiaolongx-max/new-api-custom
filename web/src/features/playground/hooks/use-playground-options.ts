@@ -51,6 +51,7 @@ import type { GroupOption, ModelOption, PlaygroundConfig } from '../types'
 type UsePlaygroundOptionsParams = {
   currentGroup: string
   currentModel: string
+  currentCompareModels?: string[]
   setGroups: (groups: GroupOption[]) => void
   setModels: (models: ModelOption[]) => void
   updateConfig: <K extends keyof PlaygroundConfig>(
@@ -62,6 +63,7 @@ type UsePlaygroundOptionsParams = {
 export function usePlaygroundOptions({
   currentGroup,
   currentModel,
+  currentCompareModels,
   setGroups,
   setModels,
   updateConfig,
@@ -114,6 +116,26 @@ export function usePlaygroundOptions({
     if (!modelsData) return
 
     setModels(modelsData)
+
+    if (currentCompareModels && currentCompareModels.length > 0) {
+      const availableModelValues = new Set(
+        modelsData.map((model) => model.value)
+      )
+      const availableCompareModels = currentCompareModels.filter((model) =>
+        availableModelValues.has(model)
+      )
+      const nextCompareModels =
+        availableCompareModels.length >= 2
+          ? availableCompareModels.slice(0, 4)
+          : modelsData
+              .slice(0, Math.min(2, modelsData.length))
+              .map((model) => model.value)
+
+      if (nextCompareModels.join('\0') !== currentCompareModels.join('\0')) {
+        updateConfig('compareModels', nextCompareModels)
+      }
+    }
+
     const fallback = getModelFallback(modelsData, currentModel)
 
     if (fallback) {
@@ -124,7 +146,7 @@ export function usePlaygroundOptions({
     if (shouldClearModelForGroup(modelsData, currentModel)) {
       updateConfig('model', '')
     }
-  }, [modelsData, currentModel, setModels, updateConfig])
+  }, [modelsData, currentCompareModels, currentModel, setModels, updateConfig])
 
   useEffect(() => {
     if (!groupsData) return

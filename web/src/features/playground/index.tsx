@@ -71,6 +71,7 @@ export function Playground() {
   const { isLoadingModels } = usePlaygroundOptions({
     currentGroup: config.group,
     currentModel: config.model,
+    currentCompareModels: config.compareModels,
     setGroups,
     setModels,
     updateConfig,
@@ -106,7 +107,13 @@ export function Playground() {
       </div>
 
       {/* Input area: center content and constrain to the container width */}
-      <div className={config.mode === 'compare' ? 'mx-auto w-full max-w-5xl' : 'mx-auto w-full max-w-4xl'}>
+      <div
+        className={
+          config.mode === 'compare'
+            ? 'mx-auto w-full max-w-5xl'
+            : 'mx-auto w-full max-w-4xl'
+        }
+      >
         <PlaygroundInput
           config={config}
           disabled={isGenerating}

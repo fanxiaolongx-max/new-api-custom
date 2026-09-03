@@ -1,3 +1,11 @@
+import {
+  BotIcon,
+  Columns2Icon,
+  MessageSquareIcon,
+  PlusIcon,
+  SparklesIcon,
+  XIcon,
+} from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,17 +25,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo } from 'react'
-import {
-  BotIcon,
-  Columns2Icon,
-  MessageSquareIcon,
-  PlusIcon,
-  SparklesIcon,
-  XIcon,
-} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { sortAndGroupModels } from '@/components/model-group-selector'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,7 +40,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { sortAndGroupModels } from '@/components/model-group-selector'
 import { cn } from '@/lib/utils'
 
 import type { ModelOption, PlaygroundConfig } from '../../types'
@@ -60,15 +60,18 @@ const MODEL_COLOR_SCHEMES = [
     dot: 'bg-blue-500',
   },
   {
-    badge: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    badge:
+      'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     dot: 'bg-emerald-500',
   },
   {
-    badge: 'border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400',
+    badge:
+      'border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400',
     dot: 'bg-purple-500',
   },
   {
-    badge: 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    badge:
+      'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400',
     dot: 'bg-amber-500',
   },
 ]
@@ -81,19 +84,53 @@ export function MultiModelBar({
 }: MultiModelBarProps) {
   const { t } = useTranslation()
   const isCompareMode = config.mode === 'compare'
-  const compareModels = config.compareModels && config.compareModels.length > 0
-    ? config.compareModels
-    : [config.model || 'gpt-4o', 'gemini-3.1-pro']
 
-  const categorizedGroups = useMemo(
-    () => sortAndGroupModels(models),
+  const categorizedGroups = useMemo(() => sortAndGroupModels(models), [models])
+
+  const presetModels = useMemo(() => {
+    const availableModels: string[] = []
+    let modelIndex = 0
+
+    while (availableModels.length < 4) {
+      let addedModel = false
+
+      for (const group of categorizedGroups) {
+        const model = group.models[modelIndex]
+        if (!model || availableModels.includes(model.value)) continue
+
+        availableModels.push(model.value)
+        addedModel = true
+        if (availableModels.length === 4) break
+      }
+
+      if (!addedModel) break
+      modelIndex += 1
+    }
+
+    return [2, 3, 4]
+      .filter((count) => availableModels.length >= count)
+      .map((count) => availableModels.slice(0, count))
+  }, [categorizedGroups])
+
+  const availableModelValues = useMemo(
+    () => new Set(models.map((model) => model.value)),
     [models]
   )
+  const configuredCompareModels = (config.compareModels ?? []).filter((model) =>
+    availableModelValues.has(model)
+  )
+  const compareModels =
+    configuredCompareModels.length >= 2
+      ? configuredCompareModels
+      : (presetModels[0] ?? models.slice(0, 2).map((model) => model.value))
 
   const handleToggleMode = (mode: 'single' | 'compare') => {
     onConfigChange('mode', mode)
-    if (mode === 'compare' && (!config.compareModels || config.compareModels.length === 0)) {
-      onConfigChange('compareModels', [config.model || 'gpt-4o', 'gemini-3.1-pro'])
+    if (
+      mode === 'compare' &&
+      (!config.compareModels || config.compareModels.length === 0)
+    ) {
+      onConfigChange('compareModels', compareModels)
     }
   }
 
@@ -139,7 +176,9 @@ export function MultiModelBar({
     )
     if (available.length < 2) {
       // fallback to first available models
-      const fallback = models.slice(0, Math.min(3, models.length)).map((m) => m.value)
+      const fallback = models
+        .slice(0, Math.min(3, models.length))
+        .map((m) => m.value)
       onConfigChange('compareModels', fallback)
     } else {
       onConfigChange('compareModels', available)
@@ -148,9 +187,9 @@ export function MultiModelBar({
   }
 
   return (
-    <div className='flex flex-wrap items-center justify-between gap-2 border-b border-border/50 bg-background/80 px-4 py-2 text-xs backdrop-blur-md transition-all'>
+    <div className='border-border/50 bg-background/80 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-xs backdrop-blur-md transition-all'>
       {/* Mode Switch Tabs */}
-      <div className='flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 p-0.5 shadow-xs'>
+      <div className='border-border/60 bg-muted/40 flex items-center gap-1 rounded-lg border p-0.5 shadow-xs'>
         <button
           type='button'
           disabled={disabled}
@@ -182,7 +221,9 @@ export function MultiModelBar({
             variant='outline'
             className={cn(
               'ml-0.5 h-4 px-1 text-[10px] font-bold uppercase',
-              isCompareMode ? 'border-primary-foreground/30 text-primary-foreground' : 'text-primary'
+              isCompareMode
+                ? 'border-primary-foreground/30 text-primary-foreground'
+                : 'text-primary'
             )}
           >
             Arena
@@ -193,7 +234,7 @@ export function MultiModelBar({
       {/* Compare Models Badges & Add Button */}
       {isCompareMode && (
         <div className='flex flex-1 flex-wrap items-center justify-end gap-1.5 sm:gap-2'>
-          <span className='hidden text-muted-foreground sm:inline'>
+          <span className='text-muted-foreground hidden sm:inline'>
             {t('Comparing {{count}} models:', { count: compareModels.length })}
           </span>
 
@@ -202,7 +243,7 @@ export function MultiModelBar({
               const colorScheme =
                 MODEL_COLOR_SCHEMES[index % MODEL_COLOR_SCHEMES.length]
               return (
-                <DropdownMenu key={`${modelName}-${index}`}>
+                <DropdownMenu key={modelName}>
                   <DropdownMenuTrigger
                     render={
                       <div
@@ -217,7 +258,10 @@ export function MultiModelBar({
                     }
                   >
                     <span
-                      className={cn('size-1.5 rounded-full animate-pulse', colorScheme.dot)}
+                      className={cn(
+                        'size-1.5 rounded-full animate-pulse',
+                        colorScheme.dot
+                      )}
                     />
                     <BotIcon size={12} />
                     <span className='max-w-[120px] truncate font-mono text-[11px] font-semibold sm:max-w-[160px]'>
@@ -231,7 +275,7 @@ export function MultiModelBar({
                           e.stopPropagation()
                           handleRemoveModel(modelName)
                         }}
-                        className='ml-0.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100 hover:text-destructive'
+                        className='hover:text-destructive ml-0.5 rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100'
                         title={t('Remove from comparison')}
                       >
                         <XIcon size={10} />
@@ -239,35 +283,47 @@ export function MultiModelBar({
                     )}
                   </DropdownMenuTrigger>
 
-                  <DropdownMenuContent align='start' className='max-h-72 w-56 overflow-y-auto'>
-                    <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
-                      {t('Replace with model')}
-                    </DropdownMenuLabel>
+                  <DropdownMenuContent
+                    align='start'
+                    className='max-h-72 w-56 overflow-y-auto'
+                  >
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className='text-muted-foreground text-xs font-semibold'>
+                        {t('Replace with model')}
+                      </DropdownMenuLabel>
+                    </DropdownMenuGroup>
                     <DropdownMenuSeparator />
-                    {categorizedGroups.map(({ category, models: categoryModels }) => (
-                      <DropdownMenuGroup key={category}>
-                        <div className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1'>
-                          {category}
-                        </div>
-                        {categoryModels.map((m) => (
-                          <DropdownMenuItem
-                            key={m.value}
-                            disabled={compareModels.includes(m.value) && m.value !== modelName}
-                            onClick={() => handleReplaceModel(index, m.value)}
-                            className='text-xs font-mono'
-                          >
-                            <BotIcon className='mr-2 size-3.5' />
-                            <span className='truncate'>{m.label || m.value}</span>
-                            {m.value === modelName && (
-                              <span className='ml-auto text-[10px] text-muted-foreground'>
-                                ({t('Current')})
+                    {categorizedGroups.map(
+                      ({ category, models: categoryModels }) => (
+                        <DropdownMenuGroup key={category}>
+                          <div className='text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase'>
+                            {category}
+                          </div>
+                          {categoryModels.map((m) => (
+                            <DropdownMenuItem
+                              key={m.value}
+                              disabled={
+                                compareModels.includes(m.value) &&
+                                m.value !== modelName
+                              }
+                              onClick={() => handleReplaceModel(index, m.value)}
+                              className='font-mono text-xs'
+                            >
+                              <BotIcon className='mr-2 size-3.5' />
+                              <span className='truncate'>
+                                {m.label || m.value}
                               </span>
-                            )}
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                      </DropdownMenuGroup>
-                    ))}
+                              {m.value === modelName && (
+                                <span className='text-muted-foreground ml-auto text-[10px]'>
+                                  ({t('Current')})
+                                </span>
+                              )}
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuSeparator />
+                        </DropdownMenuGroup>
+                      )
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )
@@ -291,27 +347,34 @@ export function MultiModelBar({
                 <span>{t('Add model')}</span>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align='end' className='max-h-72 w-56 overflow-y-auto'>
-                <DropdownMenuLabel className='text-xs font-semibold text-muted-foreground'>
-                  {t('Select model to add')}
-                </DropdownMenuLabel>
+              <DropdownMenuContent
+                align='end'
+                className='max-h-72 w-56 overflow-y-auto'
+              >
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className='text-muted-foreground text-xs font-semibold'>
+                    {t('Select model to add')}
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 {categorizedGroups
                   .map(({ category, models: categoryModels }) => ({
                     category,
-                    models: categoryModels.filter((m) => !compareModels.includes(m.value)),
+                    models: categoryModels.filter(
+                      (m) => !compareModels.includes(m.value)
+                    ),
                   }))
                   .filter((g) => g.models.length > 0)
                   .map(({ category, models: categoryModels }) => (
                     <DropdownMenuGroup key={category}>
-                      <div className='text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1'>
+                      <div className='text-muted-foreground px-2 py-1 text-[10px] font-semibold tracking-wider uppercase'>
                         {category}
                       </div>
                       {categoryModels.map((m) => (
                         <DropdownMenuItem
                           key={m.value}
                           onClick={() => handleAddModel(m.value)}
-                          className='text-xs font-mono'
+                          className='font-mono text-xs'
                         >
                           <BotIcon className='mr-2 size-3.5' />
                           <span className='truncate'>{m.label || m.value}</span>
@@ -332,7 +395,7 @@ export function MultiModelBar({
                   disabled={disabled}
                   size='sm'
                   variant='ghost'
-                  className='h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground'
+                  className='text-muted-foreground hover:text-foreground h-7 gap-1 px-2 text-xs'
                 />
               }
             >
@@ -345,36 +408,21 @@ export function MultiModelBar({
                   {t('Comparison Presets')}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() =>
-                    handleApplyPreset(['gpt-4o', 'gemini-3.1-pro'])
-                  }
-                >
-                  GPT-4o vs Gemini 3.1
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    handleApplyPreset([
-                      'gpt-4o',
-                      'gemini-3.1-pro',
-                      'claude-3-5-sonnet',
-                    ])
-                  }
-                >
-                  {t('Top 3 Flagship Models')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    handleApplyPreset([
-                      'gpt-4o',
-                      'gemini-3.1-pro',
-                      'claude-3-5-sonnet',
-                      'deepseek-r1',
-                    ])
-                  }
-                >
-                  {t('All-Stars Arena (4 Models)')}
-                </DropdownMenuItem>
+                {presetModels.length > 0 ? (
+                  presetModels.map((preset) => (
+                    <DropdownMenuItem
+                      key={preset.length}
+                      onClick={() => handleApplyPreset(preset)}
+                      className='font-mono text-xs'
+                    >
+                      <span className='truncate'>{preset.join(' + ')}</span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem disabled>
+                    {t('At least 2 models required for comparison')}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

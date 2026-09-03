@@ -22,7 +22,6 @@ import {
   Layers,
   ScrollText,
   Server,
-  Terminal,
   Zap,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -32,9 +31,6 @@ import { Button } from '@/components/ui/button'
 
 export function ServicesHubPanel() {
   const { t } = useTranslation()
-
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:'
 
   const services = [
     {
@@ -49,6 +45,19 @@ export function ServicesHubPanel() {
       color: 'text-violet-500',
       bg: 'bg-violet-500/10 border-violet-500/25 hover:border-violet-500/50',
       buttonBg: 'bg-violet-600 hover:bg-violet-700 text-white',
+    },
+    {
+      id: 'grok2api-management',
+      name: t('Grok2API native management'),
+      badge: '/creative-console',
+      description: t(
+        'Open the native Grok2API management interface for accounts, tokens, and service configuration.'
+      ),
+      url: 'https://grok-api2.fanxiaolong.uk/creative-console',
+      icon: Server,
+      color: 'text-amber-500',
+      bg: 'bg-amber-500/10 border-amber-500/25 hover:border-amber-500/50',
+      buttonBg: 'bg-amber-600 hover:bg-amber-700 text-white',
     },
     {
       id: 'chat2api',
@@ -79,65 +88,71 @@ export function ServicesHubPanel() {
   ]
 
   return (
-    <CardStaggerItem className='rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm'>
-      <div className='flex items-center justify-between gap-3 pb-3 border-b border-border/50'>
+    <CardStaggerItem className='border-border/70 bg-card rounded-2xl border p-4 shadow-sm sm:p-5'>
+      <div className='border-border/50 flex items-center justify-between gap-3 border-b pb-3'>
         <div className='flex items-center gap-2.5'>
-          <div className='flex size-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-xs'>
+          <div className='border-primary/20 bg-primary/10 text-primary flex size-9 items-center justify-center rounded-xl border shadow-xs'>
             <Layers className='size-5' />
           </div>
           <div>
-            <h3 className='text-sm sm:text-base font-semibold tracking-tight text-foreground'>
+            <h3 className='text-foreground text-sm font-semibold tracking-tight sm:text-base'>
               {t('集成服务与中间件快捷跳转 (Services Hub)')}
             </h3>
-            <p className='text-xs text-muted-foreground mt-0.5'>
-              {t('一键直达系统集成的 Grok2API、GPT2API 以及 Docker 容器实时日志面板')}
+            <p className='text-muted-foreground mt-0.5 text-xs'>
+              {t(
+                '一键直达系统集成的 Grok2API、GPT2API 以及 Docker 容器实时日志面板'
+              )}
             </p>
           </div>
         </div>
       </div>
 
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-3.5'>
+      <div className='grid grid-cols-1 gap-3.5 pt-3.5 md:grid-cols-2 xl:grid-cols-4'>
         {services.map((srv) => {
           const Icon = srv.icon
           return (
             <div
               key={srv.id}
-              className={`flex flex-col justify-between rounded-xl border p-4 transition-all duration-200 shadow-xs ${srv.bg}`}
+              className={`flex flex-col justify-between rounded-xl border p-4 shadow-xs transition-all duration-200 ${srv.bg}`}
             >
               <div>
-                <div className='flex items-start justify-between gap-2 mb-2'>
+                <div className='mb-2 flex items-start justify-between gap-2'>
                   <div className='flex items-center gap-2'>
-                    <div className={`p-1.5 rounded-lg bg-background/60 shadow-xs ${srv.color}`}>
+                    <div
+                      className={`bg-background/60 rounded-lg p-1.5 shadow-xs ${srv.color}`}
+                    >
                       <Icon size={18} />
                     </div>
                     <div>
-                      <h4 className='text-xs sm:text-sm font-semibold text-foreground leading-snug'>
+                      <h4 className='text-foreground text-xs leading-snug font-semibold sm:text-sm'>
                         {srv.name}
                       </h4>
-                      <span className='font-mono text-[11px] text-muted-foreground'>
+                      <span className='text-muted-foreground font-mono text-[11px]'>
                         {srv.badge}
                       </span>
                     </div>
                   </div>
-                  <span className='inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'>
-                    <span className='size-1.5 rounded-full bg-emerald-500 animate-pulse' />
+                  <span className='inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400'>
+                    <span className='size-1.5 animate-pulse rounded-full bg-emerald-500' />
                     在线
                   </span>
                 </div>
 
-                <p className='text-xs text-muted-foreground leading-relaxed mt-2'>
+                <p className='text-muted-foreground mt-2 text-xs leading-relaxed'>
                   {srv.description}
                 </p>
               </div>
 
-              <div className='pt-3 mt-3 border-t border-border/40 flex items-center justify-between'>
-                <span className='text-[11px] font-mono text-muted-foreground truncate max-w-[140px]'>
+              <div className='border-border/40 mt-3 flex items-center justify-between border-t pt-3'>
+                <span className='text-muted-foreground max-w-[140px] truncate font-mono text-[11px]'>
                   {srv.url}
                 </span>
                 <Button
                   size='sm'
-                  className={`h-7 px-3 text-xs gap-1.5 font-medium shadow-xs ${srv.buttonBg}`}
-                  onClick={() => window.open(srv.url, '_blank', 'noopener,noreferrer')}
+                  className={`h-7 gap-1.5 px-3 text-xs font-medium shadow-xs ${srv.buttonBg}`}
+                  onClick={() =>
+                    window.open(srv.url, '_blank', 'noopener,noreferrer')
+                  }
                 >
                   <span>{t('打开面板')}</span>
                   <ExternalLink size={11} />
