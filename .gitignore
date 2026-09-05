@@ -14,6 +14,9 @@ backups/
 *.db
 *.log
 *.db-journal
+*.db-wal
+*.db-shm
+grok2api/data_backup*/
 
 # 敏感环境变量与密钥
 .env

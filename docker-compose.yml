@@ -64,7 +64,7 @@ services:
       - ./chat2api_data:/app/data
 
   grok2api:
-    image: ghcr.io/chenyme/grok2api:v3.1.2
+    image: ghcr.io/chenyme/grok2api:v3.1.5
     container_name: grok2api
     restart: unless-stopped
     labels:
