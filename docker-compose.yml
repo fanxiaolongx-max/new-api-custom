@@ -5,6 +5,9 @@ services:
     image: new-api-custom:v1.0.0-rc.22-logs
     container_name: new-api
     restart: always
+    # Keep the API responsive when desktop VMs compete for host resources.
+    cpu_shares: 2048
+    oom_score_adj: -800
     command: --log-dir /app/logs
     expose:
       - "3000"
@@ -14,12 +17,14 @@ services:
       - /mnt/data:/mnt/data:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro
       - /sys/class/thermal:/sys/class/thermal:ro
+      - /run/new-api-vm-agent:/run/vm-agent
     environment:
       - SQL_DSN=postgresql://root:123456@postgres:5432/new-api
       - REDIS_CONN_STRING=redis://redis
       - SESSION_SECRET=4354598cbeb6e80141b2b8981a23b7f0ae37e818ae6e0d42aba4d04960049f3d
       - SESSION_COOKIE_SECURE=true
       - SESSION_COOKIE_TRUSTED_URL=https://api2.fanxiaolong.uk
+      - VM_AGENT_SOCKET=/run/vm-agent/agent.sock
       - TZ=Asia/Shanghai
     dns:
       - 1.1.1.1
@@ -46,14 +51,30 @@ services:
     volumes:
       - ./redis_data:/data
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    expose:
+      - "11434"
+    volumes:
+      - /mnt/data/ollama:/root/.ollama
+    environment:
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_CONTEXT_LENGTH=2048
+    cpus: 3.0
+    mem_limit: 3g
+    pids_limit: 256
+
   chat2api:
     image: lanqian528/chat2api:latest
     container_name: chat2api
     restart: always
     labels:
       - dev.dozzle.logs=true
-    ports:
-      - "5005:5005"
+    expose:
+      - "5005"
     environment:
       - TZ=Asia/Shanghai
       - ENABLE_GATEWAY=True
@@ -62,6 +83,34 @@ services:
       - 8.8.8.8
     volumes:
       - ./chat2api_data:/app/data
+      - ./tools/chat2api-manager/authorization.py:/app/chatgpt/authorization.py:ro
+      - ./tools/chat2api-manager/sitecustomize.py:/usr/local/lib/python3.11/site-packages/sitecustomize.py:ro
+
+  chat2api-manager:
+    image: lanqian528/chat2api:latest
+    container_name: chat2api-manager
+    restart: always
+    entrypoint: ["python", "/manager/server.py"]
+    expose:
+      - "5010"
+    environment:
+      - CHAT2API_DATA_DIR=/app/data
+      - CHAT2API_URL=http://chat2api:5005
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./chat2api_data:/app/data
+      - ./tools/chat2api-manager/server.py:/manager/server.py:ro
+    depends_on:
+      - chat2api
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 64
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5010/healthz', timeout=2).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   grok2api:
     image: ghcr.io/chenyme/grok2api:v3.1.5
@@ -107,6 +156,56 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dozzle_data:/data
 
+  guacd:
+    image: guacamole/guacd:1.6.0
+    container_name: guacd
+    restart: always
+    expose:
+      - "4822"
+    volumes:
+      - /mnt/data/guacamole-drive:/drive
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
+  guacamole:
+    image: guacamole/guacamole:1.6.0
+    container_name: guacamole
+    restart: always
+    expose:
+      - "8080"
+    volumes:
+      - ./guacamole-extensions/no-browser-side-navigation.jar:/etc/guacamole/extensions/no-browser-side-navigation.jar:ro
+    environment:
+      - GUACD_HOSTNAME=guacd
+      - POSTGRESQL_HOSTNAME=postgres
+      - POSTGRESQL_DATABASE=guacamole
+      - POSTGRESQL_USERNAME=root
+      - POSTGRESQL_PASSWORD=123456
+      - HTTP_AUTH_ENABLED=true
+      - HTTP_AUTH_HEADER=Remote-User
+      - REMOTE_IP_VALVE_ENABLED=true
+      - WEBAPP_CONTEXT=guacamole
+      - JAVA_OPTS=-Xms64m -Xmx256m
+    depends_on:
+      - guacd
+      - postgres
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 384m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
   gateway:
     image: nginx:1.29-alpine
     container_name: new-api-gateway
@@ -120,3 +219,5 @@ services:
     depends_on:
       - new-api
       - dozzle
+      - guacamole
+      - chat2api-manager

@@ -27,6 +27,15 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/status/test", middleware.AdminAuth(), controller.TestStatus)
 		apiRouter.GET("/system/temperature", middleware.AdminAuth(), controller.GetSystemTemperature)
 		apiRouter.GET("/system/host-metrics", middleware.AdminAuth(), controller.GetSystemHostMetrics)
+		virtualMachineRoute := apiRouter.Group("/system/virtual-machines")
+		virtualMachineRoute.Use(middleware.RootAuth(), middleware.DisableCache())
+		{
+			virtualMachineRoute.GET("", controller.ListVirtualMachines)
+			virtualMachineRoute.POST("/:name/action", controller.ControlVirtualMachine)
+			virtualMachineRoute.GET("/:name/screenshot", controller.GetVirtualMachineScreenshot)
+			virtualMachineRoute.POST("/:name/keyboard", controller.SendVirtualMachineKeyboard)
+			virtualMachineRoute.POST("/:name/mouse", controller.SendVirtualMachineMouse)
+		}
 		apiRouter.GET("/notice", controller.GetNotice)
 		apiRouter.GET("/user-agreement", controller.GetUserAgreement)
 		apiRouter.GET("/privacy-policy", controller.GetPrivacyPolicy)

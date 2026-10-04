@@ -1,0 +1,19 @@
+[Unit]
+Description=Feiniu VirtualBox virtual machine
+RequiresMountsFor=/mnt/data
+After=local-fs.target vboxdrv.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dragon
+Group=dragon
+Environment=HOME=/home/dragon
+ExecStart=/home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/feiniu-vm-service.sh start
+ExecStop=/home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/feiniu-vm-service.sh stop
+RemainAfterExit=yes
+TimeoutStartSec=2min
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=multi-user.target

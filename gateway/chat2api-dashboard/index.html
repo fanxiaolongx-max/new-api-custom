@@ -381,6 +381,134 @@
       font-weight: 500;
     }
 
+    .pool-toolbar,
+    .pool-actions,
+    .strategy-switch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pool-toolbar {
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .pool-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(100px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .pool-stat {
+      padding: 12px;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .pool-stat strong {
+      display: block;
+      font-size: 20px;
+      margin-top: 3px;
+    }
+
+    .strategy-btn.active {
+      color: white;
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+
+    .btn-danger {
+      color: #fecaca;
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .btn-danger:hover {
+      color: white;
+      background: var(--danger);
+    }
+
+    .accounts-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+    }
+
+    .accounts-table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .accounts-table th,
+    .accounts-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .accounts-table th {
+      color: var(--text-muted);
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .accounts-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .account-name {
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .account-token {
+      margin-top: 4px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      font-weight: 600;
+    }
+
+    .status-active { color: var(--success); background: rgba(16, 185, 129, 0.1); }
+    .status-error { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+    .status-expired { color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+
+    .empty-state {
+      padding: 34px 16px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .helper-text {
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 700px) {
+      .pool-stats { grid-template-columns: repeat(2, minmax(100px, 1fr)); }
+      .pool-toolbar { align-items: flex-start; }
+      .header-actions .btn span { display: none; }
+    }
+
     /* Code Blocks */
     pre {
       background: var(--code-bg);
@@ -454,7 +582,7 @@
         <div>
           <div class="logo-title">
             <span>Chat2API 控制台</span>
-            <span class="logo-badge">v1.0 Pro</span>
+            <span class="logo-badge">多账号池</span>
           </div>
           <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
             ChatGPT Web-to-API 官方协议逆向网关
@@ -502,11 +630,11 @@
 
       <div class="card">
         <div class="card-header">
-          <span class="card-title"><i data-lucide="clock" style="width: 14px; height: 14px;"></i> Token 时效监控</span>
+          <span class="card-title"><i data-lucide="users" style="width: 14px; height: 14px;"></i> 账号池状态</span>
           <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
         </div>
         <div class="card-value" id="cardExpiryStatus" style="font-size: 18px;">
-          <span>检测中...</span>
+          <span>加载中...</span>
         </div>
         <div class="card-desc" id="cardAccountEmail">OpenAI Plus 认证鉴权</div>
       </div>
@@ -525,15 +653,15 @@
 
     <!-- Navigation Tabs -->
     <div class="tabs-nav">
-      <button class="tab-btn active" onclick="switchTab('token')">
+      <button class="tab-btn active" onclick="switchTab('token', this)">
         <i data-lucide="key-round" style="width: 14px; height: 14px;"></i>
-        <span>凭证维护 & 解析</span>
+        <span>多账号池管理</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('models')">
+      <button class="tab-btn" onclick="switchTab('models', this)">
         <i data-lucide="box" style="width: 14px; height: 14px;"></i>
         <span>可用模型列表</span>
       </button>
-      <button class="tab-btn" onclick="switchTab('api')">
+      <button class="tab-btn" onclick="switchTab('api', this)">
         <i data-lucide="terminal" style="width: 14px; height: 14px;"></i>
         <span>API 调用示例</span>
       </button>
@@ -541,13 +669,55 @@
 
     <!-- Tab 1: Token Management -->
     <div id="tab-token" class="tab-content active">
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="pool-toolbar">
+          <div>
+            <h3 style="font-size: 16px; font-weight: 650;">多账号池</h3>
+            <p class="helper-text" style="margin-top: 4px;">账号凭证仅保存在服务器，页面只显示脱敏信息。失效凭证自动隔离，限额请求自动切换账号。</p>
+          </div>
+          <div class="pool-actions">
+            <div class="strategy-switch" role="group" aria-label="账号调度策略">
+              <button id="strategyRandom" class="btn btn-outline strategy-btn" type="button" onclick="setPoolStrategy('random')">随机</button>
+              <button id="strategyRoundRobin" class="btn btn-outline strategy-btn" type="button" onclick="setPoolStrategy('round_robin')">顺序轮询</button>
+            </div>
+            <button class="btn btn-outline" type="button" onclick="loadAccountPool()">刷新</button>
+            <button class="btn btn-danger" type="button" onclick="clearAccountPool()">清空账号池</button>
+          </div>
+        </div>
+
+        <div class="pool-stats" aria-label="账号池统计">
+          <div class="pool-stat"><span class="helper-text">账号总数</span><strong id="poolTotal">-</strong></div>
+          <div class="pool-stat"><span class="helper-text">正常</span><strong id="poolActive" style="color: var(--success);">-</strong></div>
+          <div class="pool-stat"><span class="helper-text">异常隔离</span><strong id="poolError" style="color: var(--danger);">-</strong></div>
+          <div class="pool-stat"><span class="helper-text">已过期</span><strong id="poolExpired" style="color: var(--warning);">-</strong></div>
+        </div>
+
+        <div class="accounts-table-wrap">
+          <table class="accounts-table">
+            <thead>
+              <tr>
+                <th>账号</th>
+                <th>套餐</th>
+                <th>凭证类型</th>
+                <th>到期时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="accountsTableBody">
+              <tr><td colspan="6"><div class="empty-state">正在加载账号池…</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="token-panel">
         <!-- Left: Paste Box -->
         <div class="card">
           <div class="card-header">
             <h3 style="font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
               <i data-lucide="clipboard-paste" style="width: 16px; height: 16px; color: var(--primary);"></i>
-              <span>粘贴 Session JSON / AccessToken</span>
+              <span>批量添加账号</span>
             </h3>
             <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="pasteFromClipboard()">
               <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
@@ -573,20 +743,21 @@
               </li>
               <li class="step-item">
                 <span class="step-num">3</span>
-                <span>直接粘贴到下方输入框，系统自动提取 <code>accessToken</code> 并解析到期时间。</span>
+                <span>粘贴 Session JSON，或每行放一个 AccessToken / RefreshToken，然后添加到账号池。</span>
               </li>
             </ul>
           </div>
 
           <div class="textarea-wrapper">
-            <textarea id="tokenInput" placeholder='可直接粘贴从 https://chatgpt.com/api/auth/session 复制的完整 JSON，或单独粘贴 AccessToken...' oninput="analyzePastedToken()"></textarea>
+            <label for="tokenInput" class="helper-text">账号凭证</label>
+            <textarea id="tokenInput" placeholder='支持 Session JSON，或一行一个 AccessToken / RefreshToken…' oninput="analyzePastedToken()"></textarea>
           </div>
 
           <div style="display: flex; gap: 10px; justify-content: flex-end;">
-            <a href="/channels" class="btn btn-primary">
-              <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
-              <span>前往 Dragon API 渠道一键更新</span>
-            </a>
+            <button id="addAccountsButton" type="button" class="btn btn-primary" onclick="addAccountsToPool()">
+              <i data-lucide="user-plus" style="width: 14px; height: 14px;"></i>
+              <span>添加到账号池</span>
+            </button>
           </div>
         </div>
 
@@ -631,7 +802,7 @@
 
           <div style="margin-top: 20px; padding: 14px; border-radius: 10px; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); font-size: 12px; color: var(--text-muted); line-height: 1.5;">
             <b style="color: #a5b4fc;">📌 提示：</b> 
-            OpenAI 官方 Web 端 AccessToken 的默认有效期通常为 <b>10 天</b>。请关注到期提醒，及时更新以保障线上 API 调用不中断。
+            OpenAI Web AccessToken 有有效期。推荐定期补充有效凭证；异常账号可点击“重新启用”清除隔离状态。
           </div>
         </div>
       </div>
@@ -768,21 +939,210 @@ for chunk in response:
     });
 
     // Tab Switching
-    function switchTab(tabId) {
+    function switchTab(tabId, button) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-      event.currentTarget.classList.add('active');
+      button.classList.add('active');
       document.getElementById('tab-' + tabId).classList.add('active');
       lucide.createIcons();
     }
 
     // Toast
-    function showToast(msg) {
+    function showToast(msg, type = 'success') {
       const toast = document.getElementById('toast');
       document.getElementById('toastMsg').innerText = msg;
+      toast.style.borderColor = type === 'error' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(16, 185, 129, 0.4)';
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    async function managerRequest(path, options = {}) {
+      const response = await fetch('/chat2api/manage-api' + path, {
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options,
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(response.status === 401 || response.status === 403 ? '登录已失效，请刷新页面重新登录' : '管理服务返回了无效响应');
+      }
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || '操作失败');
+      }
+      return payload.data;
+    }
+
+    function makeCell(text) {
+      const cell = document.createElement('td');
+      cell.textContent = text;
+      return cell;
+    }
+
+    function formatExpiry(timestamp) {
+      if (!timestamp) return '由服务自动刷新';
+      return new Date(timestamp * 1000).toLocaleString();
+    }
+
+    function statusLabel(status) {
+      if (status === 'error') return '异常隔离';
+      if (status === 'expired') return '已过期';
+      return '正常';
+    }
+
+    function renderAccounts(accounts) {
+      const body = document.getElementById('accountsTableBody');
+      body.replaceChildren();
+      if (!accounts.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 6;
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = '账号池为空，请在下方批量添加账号凭证。';
+        cell.appendChild(empty);
+        row.appendChild(cell);
+        body.appendChild(row);
+        return;
+      }
+
+      accounts.forEach(account => {
+        const row = document.createElement('tr');
+        const accountCell = document.createElement('td');
+        const name = document.createElement('div');
+        name.className = 'account-name';
+        name.textContent = account.email;
+        name.title = account.email;
+        const token = document.createElement('div');
+        token.className = 'account-token';
+        token.textContent = account.masked_token;
+        accountCell.append(name, token);
+        row.appendChild(accountCell);
+        row.appendChild(makeCell(account.plan));
+        row.appendChild(makeCell(account.token_type === 'refresh' ? 'RefreshToken' : 'AccessToken'));
+        row.appendChild(makeCell(formatExpiry(account.expires_at)));
+
+        const statusCell = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'status-badge status-' + account.status;
+        badge.textContent = statusLabel(account.status);
+        statusCell.appendChild(badge);
+        row.appendChild(statusCell);
+
+        const actionsCell = document.createElement('td');
+        const actions = document.createElement('div');
+        actions.className = 'pool-actions';
+        if (account.status === 'error') {
+          const retryButton = document.createElement('button');
+          retryButton.type = 'button';
+          retryButton.className = 'btn btn-outline';
+          retryButton.textContent = '重新启用';
+          retryButton.addEventListener('click', () => retryAccount(account.id));
+          actions.appendChild(retryButton);
+        }
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'btn btn-danger';
+        deleteButton.textContent = '删除';
+        deleteButton.addEventListener('click', () => deleteAccount(account.id, account.email));
+        actions.appendChild(deleteButton);
+        actionsCell.appendChild(actions);
+        row.appendChild(actionsCell);
+        body.appendChild(row);
+      });
+    }
+
+    function renderPoolState(state) {
+      document.getElementById('poolTotal').textContent = state.counts.total;
+      document.getElementById('poolActive').textContent = state.counts.active;
+      document.getElementById('poolError').textContent = state.counts.error;
+      document.getElementById('poolExpired').textContent = state.counts.expired;
+      document.getElementById('strategyRandom').classList.toggle('active', state.strategy === 'random');
+      document.getElementById('strategyRoundRobin').classList.toggle('active', state.strategy === 'round_robin');
+      document.getElementById('cardExpiryStatus').textContent = state.counts.active + ' 个可用账号';
+      document.getElementById('cardAccountEmail').textContent = state.strategy === 'random' ? '随机账号调度' : '顺序轮询调度';
+      renderAccounts(state.accounts);
+    }
+
+    async function loadAccountPool() {
+      try {
+        renderPoolState(await managerRequest('/accounts'));
+      } catch (error) {
+        showToast(error.message, 'error');
+        const body = document.getElementById('accountsTableBody');
+        body.innerHTML = '<tr><td colspan="6"><div class="empty-state">账号池加载失败，请稍后重试。</div></td></tr>';
+      }
+    }
+
+    async function addAccountsToPool() {
+      const input = document.getElementById('tokenInput');
+      if (!input.value.trim()) {
+        showToast('请先粘贴至少一个账号凭证', 'error');
+        input.focus();
+        return;
+      }
+      const button = document.getElementById('addAccountsButton');
+      button.disabled = true;
+      try {
+        const result = await managerRequest('/accounts', {
+          method: 'POST',
+          body: JSON.stringify({ tokens: input.value }),
+        });
+        input.value = '';
+        analyzePastedToken();
+        showToast(`已添加 ${result.added} 个账号，忽略 ${result.duplicates} 个重复项`);
+        await loadAccountPool();
+      } catch (error) {
+        showToast(error.message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function deleteAccount(id, email) {
+      if (!confirm(`确认从账号池删除 ${email}？`)) return;
+      try {
+        await managerRequest('/accounts/' + encodeURIComponent(id), { method: 'DELETE' });
+        showToast('账号已删除');
+        await loadAccountPool();
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
+    }
+
+    async function retryAccount(id) {
+      try {
+        await managerRequest('/accounts/' + encodeURIComponent(id) + '/retry', { method: 'POST', body: '{}' });
+        showToast('隔离状态已清除，账号已重新启用');
+        await loadAccountPool();
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
+    }
+
+    async function clearAccountPool() {
+      if (!confirm('确认清空全部 GPT 账号？此操作无法撤销。')) return;
+      try {
+        await managerRequest('/accounts', { method: 'DELETE' });
+        showToast('账号池已清空');
+        await loadAccountPool();
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
+    }
+
+    async function setPoolStrategy(strategy) {
+      try {
+        await managerRequest('/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ strategy }),
+        });
+        showToast(strategy === 'random' ? '已切换为随机调度' : '已切换为顺序轮询');
+        await loadAccountPool();
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
     }
 
     function copyCode(id) {
@@ -897,14 +1257,7 @@ for chunk in response:
       }
     }
 
-    // Try fetching channel status on load
-    fetch('/api/status').then(r => r.json()).then(data => {
-      if (data && data.success) {
-        document.getElementById('cardExpiryStatus').innerHTML = `<span style="color: var(--success);">在线</span>`;
-      }
-    }).catch(() => {
-      document.getElementById('cardExpiryStatus').innerText = '在线中转';
-    });
+    loadAccountPool();
   </script>
 </body>
 </html>

@@ -35,6 +35,11 @@ deployment:
   clusterID: "grok2api"
   sharedMedia: false
 
+provider:
+  build:
+    clientVersion: "1.0.46"
+    userAgent: "grok-shell/1.0.46 (linux; x86_64)"
+
 media:
   driver: local
   local:

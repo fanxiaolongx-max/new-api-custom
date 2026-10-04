@@ -1,0 +1,15 @@
+[Unit]
+Description=Relay Guacamole RDP traffic to the Windows XP VirtualBox NAT port
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -ec 'gateway="$$(/usr/bin/docker network inspect eager-hypatia_default --format "{{(index .IPAM.Config 0).Gateway}}")"; exec /usr/bin/socat "TCP-LISTEN:13392,bind=$${gateway},reuseaddr,fork" TCP:127.0.0.1:13390'
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -223,3 +223,80 @@ export async function getSystemHostMetrics() {
   return res.data
 }
 
+// ----------------------------------------------------------------------------
+// Root-only VirtualBox management
+// ----------------------------------------------------------------------------
+
+export type VirtualMachineState =
+  | 'powered_off'
+  | 'saved'
+  | 'running'
+  | 'paused'
+  | 'aborted'
+  | 'error'
+  | string
+
+export interface VirtualMachine {
+  name: string
+  state: VirtualMachineState
+  os_type: string
+  memory_mb: number
+  cpu_count: number
+}
+
+export type VirtualMachineAction = 'start' | 'shutdown' | 'save' | 'poweroff'
+
+export async function getVirtualMachines() {
+  const res = await api.get<{
+    success: boolean
+    data: VirtualMachine[]
+    message?: string
+  }>('/api/system/virtual-machines')
+  return res.data
+}
+
+export async function controlVirtualMachine(
+  name: string,
+  action: VirtualMachineAction
+) {
+  const res = await api.post<{
+    success: boolean
+    data: VirtualMachine
+    message?: string
+  }>(`/api/system/virtual-machines/${encodeURIComponent(name)}/action`, {
+    action,
+  })
+  return res.data
+}
+
+export async function getVirtualMachineScreenshot(name: string): Promise<Blob> {
+  const res = await api.get(
+    `/api/system/virtual-machines/${encodeURIComponent(name)}/screenshot`,
+    { responseType: 'blob', skipErrorHandler: true }
+  )
+  return res.data as Blob
+}
+
+export async function sendVirtualMachineKeyboard(
+  name: string,
+  input: { text: string } | { scancodes: number[] }
+) {
+  const res = await api.post(
+    `/api/system/virtual-machines/${encodeURIComponent(name)}/keyboard`,
+    input,
+    { skipErrorHandler: true }
+  )
+  return res.data as { success: boolean; message?: string }
+}
+
+export async function sendVirtualMachineMouse(
+  name: string,
+  input: { x: number; y: number; buttons: number }
+) {
+  const res = await api.post(
+    `/api/system/virtual-machines/${encodeURIComponent(name)}/mouse`,
+    input,
+    { skipErrorHandler: true }
+  )
+  return res.data as { success: boolean; message?: string }
+}

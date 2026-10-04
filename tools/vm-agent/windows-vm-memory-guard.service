@@ -1,0 +1,20 @@
+[Unit]
+Description=Protect API services from Windows VM memory pressure
+RequiresMountsFor=/mnt/data
+After=local-fs.target vboxdrv.service new-api-vm-agent.service
+Wants=new-api-vm-agent.service
+
+[Service]
+Type=simple
+User=dragon
+Group=dragon
+Environment=HOME=/home/dragon
+Environment=VM_MEMORY_GUARD_THRESHOLD=94
+Environment=VM_MEMORY_GUARD_INTERVAL_SECONDS=5
+ExecStart=/home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/windows-vm-memory-guard.sh
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

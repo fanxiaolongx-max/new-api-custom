@@ -1,0 +1,8 @@
+{
+  "guacamoleVersion": "1.6.0",
+  "name": "Disable browser mouse side-button navigation",
+  "namespace": "no-browser-side-navigation",
+  "js": [
+    "no-browser-side-navigation.js"
+  ]
+}

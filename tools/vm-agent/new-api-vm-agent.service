@@ -1,0 +1,25 @@
+[Unit]
+Description=Restricted VirtualBox agent for new-api dashboard
+After=vboxdrv.service
+
+[Service]
+Type=simple
+User=dragon
+Group=dragon
+Environment=HOME=/home/dragon
+Environment=VM_AGENT_SOCKET=/run/new-api-vm-agent/agent.sock
+Environment=VM_AGENT_VMS=winXP,win7,win11,feiniu
+Environment=VM_AGENT_WINDOWS_VM=win11
+Environment=VM_AGENT_COMPANION_VM=feiniu
+Environment=VM_AGENT_WINDOWS_CPUS=4
+Environment=VM_AGENT_WINDOWS_MEMORY_MB=8192
+RuntimeDirectory=new-api-vm-agent
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/bin/python3 /home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/vm_agent.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

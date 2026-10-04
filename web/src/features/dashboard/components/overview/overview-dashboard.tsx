@@ -70,6 +70,7 @@ import { ServicesHubPanel } from './services-hub-panel'
 import { SummaryCards } from './summary-cards'
 import { TemperaturePanel } from './temperature-panel'
 import { UptimePanel } from './uptime-panel'
+import { VirtualMachinesPanel } from './virtual-machines-panel'
 
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
@@ -477,6 +478,7 @@ export function OverviewDashboard() {
   const remainQuota = Number(user?.quota ?? 0)
   const usedQuota = Number(user?.used_quota ?? 0)
   const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
+  const isRoot = Boolean(user?.role && user.role >= ROLE.SUPER_ADMIN)
 
   const apiKeysQuery = useQuery({
     queryKey: ['dashboard', 'overview', 'api-keys'],
@@ -782,6 +784,11 @@ export function OverviewDashboard() {
                   <CardStaggerItem className='lg:col-span-2'>
                     <HostMetricsPanel />
                   </CardStaggerItem>
+                  {isRoot && (
+                    <CardStaggerItem className='lg:col-span-2'>
+                      <VirtualMachinesPanel />
+                    </CardStaggerItem>
+                  )}
                   <CardStaggerItem className='lg:col-span-2'>
                     <PerformanceHealthPanel />
                   </CardStaggerItem>

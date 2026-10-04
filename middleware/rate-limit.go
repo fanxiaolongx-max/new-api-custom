@@ -166,7 +166,18 @@ func GlobalWebRateLimit() func(c *gin.Context) {
 
 func GlobalAPIRateLimit() func(c *gin.Context) {
 	if common.GlobalApiRateLimitEnable {
-		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		limiter := rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		return func(c *gin.Context) {
+			// Nginx calls this endpoint for every protected subrequest. Long-lived
+			// HTTP tunnels can generate several checks per second during normal use,
+			// so counting them against the client-wide API budget would eventually
+			// block unrelated dashboard and login requests from the same address.
+			if c.Request.Method == http.MethodGet && c.Request.URL.Path == "/api/logs/auth" {
+				c.Next()
+				return
+			}
+			limiter(c)
+		}
 	}
 	return defNext
 }
