@@ -95,6 +95,23 @@
 ### 💳 6. Stripe 订阅支付回调与安全加固
 * **并发结算加固**：重构并加固 Stripe 订阅支付回调链路，优化充值金额清空逻辑与并发状态结算，防止高并发回调下的数据不一致。
 
+### 🖥️ 7. 虚拟机全生命周期运维与 Apache Guacamole Web 远程桌面 (VM Management & Web RDP)
+* **宿主机 VM 智能代理 (`tools/vm-agent`)**：基于安全的 Unix Domain Socket (`/run/vm-agent/agent.sock`) 桥接宿主机 VirtualBox 与系统服务，以无特权隔离架构实现虚机状态探测与操作。
+* **全生命周期统一管控**：概览页原生集成 `VirtualMachinesPanel` 卡片，实时监控物理主机上所有虚拟机的开机/运行/暂停状态、操作系统类型、CPU/内存/显存分配与独立 RDP 端口；支持一键开机、优雅关机、强制重置与状态保存。
+* **免客户端 Web 远程桌面 (`VirtualMachineConsole`)**：容器编排深度整合 Apache Guacamole 1.6.0 (`guacd` + `guacamole`)，网关层通过 `_remote_desktop_auth` 校验管理员身份并实现无感 SSO，控制台可直接弹窗打开流畅的浏览器 Web RDP 桌面，支持多分辨率自适应、键盘扫描码直投与剪贴板同步。
+* **桌面环境专属优化与守护**：配套 Windows 内存压缩与清理守护脚本 (`windows-vm-memory-guard`)、XP RDP 协议中继服务 (`xp-rdp-relay`) 以及系统精简优化脚本。
+
+### 🔄 8. Chat2API 账号池管理与智能分发 (Chat2API Manager & Token Pool)
+* **轻量级管理微服务**：内置独立 `chat2api-manager` 服务（端口 5010）与嵌入式管理面板 (`/chat2api/manage-api/`)，支持批量上传 Session JSON、AccessToken 或 RefreshToken。
+* **脱敏运维与故障自愈**：支持 Token 脱敏安全显示、异常 Token 自动隔离警告、健康检查与一键重新激活，配合会话 Seed 路由保障用户对话上下文粘性。
+
+### 🦙 9. Ollama 本地模型容器与智能推荐 (Ollama Container Integration)
+* **一站式本地大模型服务**：容器编排原生整合 `ollama/ollama:latest`，配置 CPU / 内存硬限额防止与上层网关争抢系统资源。
+* **精选模型推荐配置**：预置大模型推荐清单缓存 (`model-recommendations.json`)，支持一键部署并接入本地高性价比开源模型。
+
+### ⚡ 10. 高负载进程优先级与 OOM 调度加固 (Resource Priority Hardening)
+* **核心网关优先级保护**：为核心 `new-api` 服务赋予更高 CPU 调度权重（`cpu_shares: 2048`）及降级 OOM 杀死倾向（`oom_score_adj: -800`），在宿主机运行高算力桌面虚拟机或大模型推理时，确保 API 网关始终稳定低延迟响应。
+
 
 ---
 
@@ -169,7 +186,11 @@ bash deploy.sh
 | **postgres** | `postgres:15` | 关系型数据库，存储用户、渠道、日志与计费数据 | 内部 `5432` |
 | **redis** | `redis:alpine` | 分布式缓存与 Session 状态管理，支持多实例即时收敛 | 内部 `6379` |
 | **chat2api** | `lanqian528/chat2api` | ChatGPT 接口转接服务 | `/chat2api/` |
+| **chat2api-manager** | `lanqian528/chat2api` | Chat2API 账号池管理与健康维护微服务 | `/chat2api/manage-api/` |
 | **grok2api** | `ghcr.io/chenyme/grok2api` | Grok 接口转接服务与独立管理控制台 | `/grok2api/` |
+| **ollama** | `ollama/ollama:latest` | 本地轻量开源大模型推理引擎 | 内部 `11434` |
+| **guacd** | `guacamole/guacd:1.6.0` | Apache Guacamole 远程桌面代理守护进程 | 内部 `4822` |
+| **guacamole** | `guacamole/guacamole:1.6.0` | Apache Guacamole Web 客户端，支持 SSO 免密透传 | `/guacamole/` |
 | **dozzle** | `amir20/dozzle` | 容器实时日志查看器（由 `/_logs_auth` 提供免密单点登录保护） | `/logs` |
 
 > **💡 磁盘与硬件监控说明：**

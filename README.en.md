@@ -99,6 +99,23 @@ Built upon the high-performance architecture of [New API](https://github.com/Qua
 ### 💳 6. Stripe Subscription & Concurrency Hardening
 * **Reliable Settlement**: Hardened Stripe webhook handlers and balance synchronization to prevent race conditions during high-concurrency top-ups.
 
+### 🖥️ 7. Full VM Lifecycle Management & Apache Guacamole Web RDP (VM Management & Web RDP)
+* **Host VM Agent Daemon (`tools/vm-agent`)**: Bridges host VirtualBox and system services over a secure Unix Domain Socket (`/run/vm-agent/agent.sock`), enabling unprivileged, isolated host VM state inspection and operation.
+* **Unified Lifecycle Orchestration**: Integrated `VirtualMachinesPanel` on the overview dashboard monitors power state (running/paused/stopped), guest OS type, CPU/RAM/VRAM allocations, and dedicated RDP ports across all VMs; supports one-click start, graceful ACPI shutdown, hard reset, and state pause.
+* **Clientless Web Remote Desktop (`VirtualMachineConsole`)**: Docker Compose natively integrates Apache Guacamole 1.6.0 (`guacd` + `guacamole`). The gateway layer verifies administrator credentials via `_remote_desktop_auth` for transparent SSO, launching an in-browser Web RDP console with multi-resolution scaling, direct scancode injection, and clipboard synchronization.
+* **Guest Desktop Optimization**: Includes Windows memory guard daemons (`windows-vm-memory-guard`), legacy Windows XP RDP relay proxies (`xp-rdp-relay`), and desktop performance optimization scripts.
+
+### 🔄 8. Chat2API Token Pool Manager & Smart Routing (Chat2API Manager & Token Pool)
+* **Dedicated Management Microservice**: Features an embedded lightweight `chat2api-manager` service (port 5010) and management dashboard (`/chat2api/manage-api/`), supporting batch imports of Session JSONs, AccessTokens, or RefreshTokens.
+* **Masked Ops & Fault Quarantine**: Displays masked tokens, automatically quarantines faulty tokens with retry capabilities, and utilizes seed-based routing to preserve conversation context.
+
+### 🦙 9. Ollama Local LLM Container & Model Recommendations (Ollama Container Integration)
+* **Turnkey Local Inference**: Natively orchestrates `ollama/ollama:latest` with dedicated CPU/memory limits to prevent resource contention.
+* **Curated Recommendation Presets**: Bundles cached model recommendation configurations (`model-recommendations.json`) for seamless one-click local deployment of cost-effective open-source models.
+
+### ⚡ 10. High-Load Process Priority & OOM Hardening (Resource Priority Hardening)
+* **Core Gateway QoS Protection**: Configures elevated CPU scheduling weights (`cpu_shares: 2048`) and reduced OOM score (`oom_score_adj: -800`) for `new-api`, guaranteeing low-latency response even under heavy desktop VM loads or concurrent local LLM inference.
+
 
 ---
 
@@ -170,7 +187,11 @@ bash deploy.sh
 | **postgres** | `postgres:15` | Relational database for users, channels, logs, and billing | Internal `5432` |
 | **redis** | `redis:alpine` | Distributed cache, rate limiter, and centralized session bridge | Internal `6379` |
 | **chat2api** | `lanqian528/chat2api` | ChatGPT upstream proxy service | `/chat2api/` |
+| **chat2api-manager** | `lanqian528/chat2api` | Chat2API token pool manager and health monitoring service | `/chat2api/manage-api/` |
 | **grok2api** | `ghcr.io/chenyme/grok2api` | Grok upstream proxy service and web dashboard | `/grok2api/` |
+| **ollama** | `ollama/ollama:latest` | Local lightweight LLM inference engine | Internal `11434` |
+| **guacd** | `guacamole/guacd:1.6.0` | Apache Guacamole remote desktop proxy daemon | Internal `4822` |
+| **guacamole** | `guacamole/guacamole:1.6.0` | Apache Guacamole web client with SSO passthrough | `/guacamole/` |
 | **dozzle** | `amir20/dozzle` | Real-time container log viewer (protected by `/_logs_auth` SSO) | `/logs` |
 
 > **💡 Host Telemetry Mounts:**

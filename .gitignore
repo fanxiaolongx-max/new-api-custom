@@ -2,10 +2,11 @@
 postgres_data/
 redis_data/
 chat2api_data/
+ollama_data/
+dozzle_data/
 data/
 /data/
 grok2api/data/
-dozzle_data/admin/
 
 # 运行日志与备份文件
 logs/
@@ -21,6 +22,10 @@ grok2api/data_backup*/
 # 敏感环境变量与密钥
 .env
 .env.local
+*.pem
+*.key
+id_ed25519*
+id_rsa*
 
 # Node & 前端构建产物
 node_modules/
