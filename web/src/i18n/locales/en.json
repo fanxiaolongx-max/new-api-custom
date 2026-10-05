@@ -5443,5 +5443,10 @@
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
     "Zoom": "Zoom"
-  }
+  },
+  "Automatic save timeout updated": "Automatic save timeout updated",
+  "Enter a whole number from 0 to 1440.": "Enter a whole number from 0 to 1440.",
+  "Inactivity timeout (minutes)": "Inactivity timeout (minutes)",
+  "Save timeout": "Save timeout",
+  "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.": "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection."
 }

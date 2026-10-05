@@ -23,14 +23,23 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { VirtualMachinesPanel } from '../virtual-machines-panel'
 
-const { controlVirtualMachine, getVirtualMachines } = vi.hoisted(() => ({
+const {
+  controlVirtualMachine,
+  getVirtualMachineSettings,
+  getVirtualMachines,
+  updateVirtualMachineSettings,
+} = vi.hoisted(() => ({
   controlVirtualMachine: vi.fn(),
+  getVirtualMachineSettings: vi.fn(),
   getVirtualMachines: vi.fn(),
+  updateVirtualMachineSettings: vi.fn(),
 }))
 
 vi.mock('@/features/dashboard/api', () => ({
   controlVirtualMachine,
+  getVirtualMachineSettings,
   getVirtualMachines,
+  updateVirtualMachineSettings,
   getVirtualMachineScreenshot: vi.fn(),
   sendVirtualMachineKeyboard: vi.fn(),
   sendVirtualMachineMouse: vi.fn(),
@@ -80,6 +89,14 @@ describe('virtual machine management', () => {
       ],
     })
     controlVirtualMachine.mockResolvedValue({ success: true })
+    getVirtualMachineSettings.mockResolvedValue({
+      success: true,
+      data: { idle_save_minutes: 30 },
+    })
+    updateVirtualMachineSettings.mockResolvedValue({
+      success: true,
+      data: { idle_save_minutes: 45 },
+    })
   })
 
   test('offers start only for stopped machines and remote control for running machines', async () => {
@@ -121,6 +138,24 @@ describe('virtual machine management', () => {
     if (!confirmButton) throw new Error('confirmation button not found')
     await user.click(confirmButton)
     expect(controlVirtualMachine).toHaveBeenCalledWith('win11', 'poweroff')
+
+    queryClient.clear()
+  })
+
+  test('updates the inactivity timeout immediately', async () => {
+    const user = userEvent.setup()
+    const queryClient = renderPanel()
+
+    const input = await screen.findByRole('spinbutton', {
+      name: 'Inactivity timeout (minutes)',
+    })
+    await user.clear(input)
+    await user.type(input, '45')
+    await user.click(screen.getByRole('button', { name: 'Save timeout' }))
+
+    expect(updateVirtualMachineSettings).toHaveBeenCalledWith({
+      idle_save_minutes: 45,
+    })
 
     queryClient.clear()
   })

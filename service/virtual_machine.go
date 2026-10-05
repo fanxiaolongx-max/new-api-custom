@@ -66,6 +66,10 @@ type VirtualMachineInput struct {
 	Buttons   int    `json:"buttons,omitempty"`
 }
 
+type VirtualMachineSettings struct {
+	IdleSaveMinutes int `json:"idle_save_minutes"`
+}
+
 func newVMAgentClient() *http.Client {
 	socketPath := os.Getenv("VM_AGENT_SOCKET")
 	if socketPath == "" {
@@ -129,6 +133,30 @@ func ListVirtualMachines() ([]VirtualMachine, error) {
 		return nil, err
 	}
 	return result.VMs, nil
+}
+
+func GetVirtualMachineSettings() (VirtualMachineSettings, error) {
+	response, err := callVMAgent(http.MethodGet, "/v1/settings", nil)
+	if err != nil {
+		return VirtualMachineSettings{}, err
+	}
+	var result VirtualMachineSettings
+	if err := decodeVMAgentResponse(response, &result); err != nil {
+		return VirtualMachineSettings{}, err
+	}
+	return result, nil
+}
+
+func UpdateVirtualMachineSettings(settings VirtualMachineSettings) (VirtualMachineSettings, error) {
+	response, err := callVMAgent(http.MethodPut, "/v1/settings", settings)
+	if err != nil {
+		return VirtualMachineSettings{}, err
+	}
+	var result VirtualMachineSettings
+	if err := decodeVMAgentResponse(response, &result); err != nil {
+		return VirtualMachineSettings{}, err
+	}
+	return result, nil
 }
 
 func ControlVirtualMachine(name string, action string) (VirtualMachine, error) {

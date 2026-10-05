@@ -5443,5 +5443,10 @@
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
     "Zoom": "Zoom"
-  }
+  },
+  "Automatic save timeout updated": "Le délai d’enregistrement automatique a été mis à jour",
+  "Enter a whole number from 0 to 1440.": "Saisissez un nombre entier compris entre 0 et 1440.",
+  "Inactivity timeout (minutes)": "Délai d’inactivité (minutes)",
+  "Save timeout": "Enregistrer le délai",
+  "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.": "Utilisez 0 pour désactiver cette fonction. L’état des machines Windows en cours d’exécution est enregistré après ce nombre de minutes sans connexion RDP ni console de base."
 }

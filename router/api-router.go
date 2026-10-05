@@ -31,6 +31,8 @@ func SetApiRouter(router *gin.Engine) {
 		virtualMachineRoute.Use(middleware.RootAuth(), middleware.DisableCache())
 		{
 			virtualMachineRoute.GET("", controller.ListVirtualMachines)
+			virtualMachineRoute.GET("/settings", controller.GetVirtualMachineSettings)
+			virtualMachineRoute.PUT("/settings", controller.UpdateVirtualMachineSettings)
 			virtualMachineRoute.POST("/:name/action", controller.ControlVirtualMachine)
 			virtualMachineRoute.GET("/:name/screenshot", controller.GetVirtualMachineScreenshot)
 			virtualMachineRoute.POST("/:name/keyboard", controller.SendVirtualMachineKeyboard)

@@ -5443,5 +5443,10 @@
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
     "Zoom": "缩放"
-  }
+  },
+  "Automatic save timeout updated": "自动保存超时时间已更新",
+  "Enter a whole number from 0 to 1440.": "请输入 0 到 1440 之间的整数。",
+  "Inactivity timeout (minutes)": "无控制超时（分钟）",
+  "Save timeout": "保存超时设置",
+  "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.": "设为 0 可禁用。运行中的 Windows 虚拟机在指定分钟内没有 RDP 或基础控制台连接后将自动保存状态。"
 }

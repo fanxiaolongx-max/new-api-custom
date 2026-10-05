@@ -5443,5 +5443,10 @@
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
     "Zoom": "Zoom"
-  }
+  },
+  "Automatic save timeout updated": "Тайм-аут автоматического сохранения обновлён",
+  "Enter a whole number from 0 to 1440.": "Введите целое число от 0 до 1440.",
+  "Inactivity timeout (minutes)": "Тайм-аут бездействия (минуты)",
+  "Save timeout": "Сохранить тайм-аут",
+  "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.": "Укажите 0, чтобы отключить функцию. Состояние работающих виртуальных машин Windows сохраняется после указанного числа минут без подключения по RDP или через базовую консоль."
 }

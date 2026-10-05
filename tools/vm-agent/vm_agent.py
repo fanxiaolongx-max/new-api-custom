@@ -32,6 +32,19 @@ WINDOWS_VM = os.environ.get("VM_AGENT_WINDOWS_VM", "win11")
 COMPANION_VM = os.environ.get("VM_AGENT_COMPANION_VM", "feiniu")
 WINDOWS_VM_CPUS = int(os.environ.get("VM_AGENT_WINDOWS_CPUS", "4"))
 WINDOWS_VM_MEMORY_MB = int(os.environ.get("VM_AGENT_WINDOWS_MEMORY_MB", "8192"))
+IDLE_SAVE_VMS = tuple(
+    name.strip()
+    for name in os.environ.get("VM_AGENT_IDLE_SAVE_VMS", "winXP,win7,win11").split(",")
+    if name.strip() in ALLOWED_VMS
+)
+DEFAULT_IDLE_SAVE_MINUTES = int(os.environ.get("VM_AGENT_IDLE_SAVE_MINUTES", "30"))
+MAX_IDLE_SAVE_MINUTES = 24 * 60
+SETTINGS_PATH = Path(
+    os.environ.get(
+        "VM_AGENT_SETTINGS_PATH",
+        "/var/lib/new-api-vm-agent/settings.json",
+    )
+)
 LIFECYCLE_MARKER = Path(
     os.environ.get(
         "VM_AGENT_LIFECYCLE_MARKER",
@@ -64,7 +77,7 @@ def run_vbox(*args: str, timeout: int = 20) -> str:
     return completed.stdout
 
 
-def machine_info(name: str) -> dict[str, object]:
+def machine_readable_values(name: str) -> dict[str, str]:
     output = run_vbox("showvminfo", name, "--machinereadable")
     values: dict[str, str] = {}
     for line in output.splitlines():
@@ -72,6 +85,11 @@ def machine_info(name: str) -> dict[str, object]:
         if not separator:
             continue
         values[key] = value.strip().strip('"')
+    return values
+
+
+def machine_info(name: str) -> dict[str, object]:
+    values = machine_readable_values(name)
 
     raw_state = values.get("VMState", "unknown").lower()
     return {
@@ -81,6 +99,65 @@ def machine_info(name: str) -> dict[str, object]:
         "memory_mb": int(values.get("memory", "0")),
         "cpu_count": int(values.get("cpus", "0")),
     }
+
+
+def rdp_port_for_machine(name: str) -> int | None:
+    for key, value in machine_readable_values(name).items():
+        if not key.startswith("Forwarding("):
+            continue
+        fields = value.split(",")
+        if len(fields) == 6 and fields[0].lower() == "rdp" and fields[1] == "tcp":
+            try:
+                return int(fields[3])
+            except ValueError:
+                return None
+    return None
+
+
+def has_established_connection(local_port: int) -> bool:
+    expected_port = f"{local_port:04X}"
+    for table_path in (Path("/proc/net/tcp"), Path("/proc/net/tcp6")):
+        try:
+            lines = table_path.read_text(encoding="ascii").splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            columns = line.split()
+            if len(columns) > 3 and columns[1].rsplit(":", 1)[-1] == expected_port:
+                if columns[3] == "01":
+                    return True
+    return False
+
+
+def validate_idle_save_minutes(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("idle_save_minutes must be an integer")
+    if value < 0 or value > MAX_IDLE_SAVE_MINUTES:
+        raise ValueError(
+            f"idle_save_minutes must be between 0 and {MAX_IDLE_SAVE_MINUTES}"
+        )
+    return value
+
+
+def load_idle_save_minutes() -> int:
+    try:
+        payload = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        return validate_idle_save_minutes(payload.get("idle_save_minutes"))
+    except FileNotFoundError:
+        return validate_idle_save_minutes(DEFAULT_IDLE_SAVE_MINUTES)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vm-agent: invalid settings file, using default: {exc}", flush=True)
+        return validate_idle_save_minutes(DEFAULT_IDLE_SAVE_MINUTES)
+
+
+def persist_idle_save_minutes(minutes: int) -> None:
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = SETTINGS_PATH.with_suffix(".tmp")
+    temporary_path.write_text(
+        json.dumps({"idle_save_minutes": minutes}) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary_path, SETTINGS_PATH)
 
 
 def save_companion_for_windows() -> bool:
@@ -145,7 +222,55 @@ class UnixHTTPServer(HTTPServer):
     def __init__(self, socket_path: str, handler: type[BaseHTTPRequestHandler]) -> None:
         self.vbox_manager = VirtualBoxManager(None, None)
         self.next_lifecycle_check = time.monotonic()
+        self.idle_save_minutes = load_idle_save_minutes()
+        self.last_control_activity = {
+            name: time.monotonic() for name in IDLE_SAVE_VMS
+        }
+        self.last_vm_states: dict[str, str] = {}
+        self.rdp_ports: dict[str, int | None] = {}
         super().__init__(socket_path, handler)
+
+    def mark_control_activity(self, name: str) -> None:
+        if name in self.last_control_activity:
+            self.last_control_activity[name] = time.monotonic()
+
+    def update_idle_save_minutes(self, minutes: int) -> None:
+        minutes = validate_idle_save_minutes(minutes)
+        persist_idle_save_minutes(minutes)
+        self.idle_save_minutes = minutes
+
+    def reconcile_idle_saves(self) -> None:
+        now = time.monotonic()
+        timeout_seconds = self.idle_save_minutes * 60
+        for name in IDLE_SAVE_VMS:
+            state = str(machine_info(name)["state"])
+            previous_state = self.last_vm_states.get(name)
+            self.last_vm_states[name] = state
+            if state not in {"running", "paused"}:
+                continue
+            if previous_state not in {None, "running", "paused"}:
+                self.last_control_activity[name] = now
+
+            if state == "running":
+                if name not in self.rdp_ports:
+                    self.rdp_ports[name] = rdp_port_for_machine(name)
+                rdp_port = self.rdp_ports[name]
+                if rdp_port is not None and has_established_connection(rdp_port):
+                    self.last_control_activity[name] = now
+                    continue
+
+            if timeout_seconds == 0:
+                continue
+            inactive_seconds = now - self.last_control_activity[name]
+            if inactive_seconds < timeout_seconds:
+                continue
+            run_vbox("controlvm", name, "savestate", timeout=30)
+            self.last_control_activity[name] = now
+            self.last_vm_states[name] = "saved"
+            print(
+                f"vm-agent: saved {name} after {self.idle_save_minutes} inactive minutes",
+                flush=True,
+            )
 
     def server_bind(self) -> None:
         socket_path = Path(self.server_address)
@@ -170,6 +295,10 @@ class UnixHTTPServer(HTTPServer):
             reconcile_vm_lifecycle()
         except Exception as exc:
             print(f"vm-agent: lifecycle reconciliation failed: {exc}", flush=True)
+        try:
+            self.reconcile_idle_saves()
+        except Exception as exc:
+            print(f"vm-agent: idle-save reconciliation failed: {exc}", flush=True)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -211,6 +340,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
+            if urlparse(self.path).path == "/v1/settings":
+                self.send_json(
+                    200, {"idle_save_minutes": self.server.idle_save_minutes}
+                )
+                return
             if urlparse(self.path).path == "/v1/vms":
                 reconcile_vm_lifecycle()
                 self.send_json(200, {"vms": [machine_info(name) for name in ALLOWED_VMS]})
@@ -229,6 +363,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 run_vbox("controlvm", name, "screenshotpng", path, timeout=10)
                 body = Path(path).read_bytes()
+                self.server.mark_control_activity(name)
             finally:
                 Path(path).unlink(missing_ok=True)
             self.send_response(200)
@@ -237,6 +372,21 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
+        except Exception as exc:
+            self.send_json(502, {"error": str(exc)})
+
+    def do_PUT(self) -> None:
+        try:
+            if urlparse(self.path).path != "/v1/settings":
+                self.send_json(404, {"error": "not found"})
+                return
+            payload = self.read_json()
+            self.server.update_idle_save_minutes(payload.get("idle_save_minutes"))
+            self.send_json(
+                200, {"idle_save_minutes": self.server.idle_save_minutes}
+            )
+        except ValueError as exc:
+            self.send_json(400, {"error": str(exc)})
         except Exception as exc:
             self.send_json(502, {"error": str(exc)})
 
@@ -281,6 +431,7 @@ class Handler(BaseHTTPRequestHandler):
                 if name == WINDOWS_VM:
                     configure_windows_resources(info)
                 run_vbox("startvm", name, "--type", "headless", timeout=30)
+                self.server.mark_control_activity(name)
             except Exception:
                 if name == WINDOWS_VM and companion_saved:
                     restore_companion_after_windows()
@@ -322,6 +473,7 @@ class Handler(BaseHTTPRequestHandler):
             run_vbox("controlvm", name, "keyboardputscancode", *codes)
         else:
             raise ValueError("keyboard input is required")
+        self.server.mark_control_activity(name)
         self.send_json(200, {"success": True})
 
     def handle_mouse(self, name: str, payload: dict[str, object]) -> None:
@@ -343,6 +495,7 @@ class Handler(BaseHTTPRequestHandler):
             machine = manager.getVirtualBox().findMachine(name)
             session = manager.openMachineSession(machine, fPermitSharing=True)
             session.console.mouse.putMouseEventAbsolute(x, y, 0, 0, buttons)
+            self.server.mark_control_activity(name)
         finally:
             if session is not None:
                 manager.closeMachineSession(session)

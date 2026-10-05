@@ -13,9 +13,13 @@ Environment=VM_AGENT_WINDOWS_VM=win11
 Environment=VM_AGENT_COMPANION_VM=feiniu
 Environment=VM_AGENT_WINDOWS_CPUS=4
 Environment=VM_AGENT_WINDOWS_MEMORY_MB=8192
+Environment=VM_AGENT_IDLE_SAVE_VMS=winXP,win7,win11
+Environment=VM_AGENT_IDLE_SAVE_MINUTES=30
 RuntimeDirectory=new-api-vm-agent
 RuntimeDirectoryMode=0755
 RuntimeDirectoryPreserve=yes
+StateDirectory=new-api-vm-agent
+StateDirectoryMode=0750
 ExecStart=/usr/bin/python3 /home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/vm_agent.py
 Restart=on-failure
 RestartSec=3

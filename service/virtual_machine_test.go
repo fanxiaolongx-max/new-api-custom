@@ -80,3 +80,22 @@ func TestControlVirtualMachineReturnsAgentValidationError(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, "unsupported action", err.Error())
 }
+
+func TestUpdateVirtualMachineSettingsForwardsTimeoutAndReturnsAppliedValue(t *testing.T) {
+	withVMAgentFixture(t, func(request *http.Request) (*http.Response, error) {
+		assert.Equal(t, http.MethodPut, request.Method)
+		assert.Equal(t, "/v1/settings", request.URL.Path)
+		body, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"idle_save_minutes":45}`, string(body))
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"idle_save_minutes":45}`)),
+		}, nil
+	})
+
+	settings, err := UpdateVirtualMachineSettings(VirtualMachineSettings{IdleSaveMinutes: 45})
+
+	require.NoError(t, err)
+	assert.Equal(t, 45, settings.IdleSaveMinutes)
+}

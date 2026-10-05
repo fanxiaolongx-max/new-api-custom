@@ -41,10 +41,21 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
 import { IconBadge } from '@/components/ui/icon-badge'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import {
   controlVirtualMachine,
+  getVirtualMachineSettings,
   getVirtualMachines,
+  updateVirtualMachineSettings,
   type VirtualMachine,
   type VirtualMachineAction,
 } from '@/features/dashboard/api'
@@ -53,6 +64,11 @@ import { cn } from '@/lib/utils'
 import { VirtualMachineConsole } from './virtual-machine-console'
 
 const VM_QUERY_KEY = ['system', 'virtual-machines'] as const
+const VM_SETTINGS_QUERY_KEY = [
+  'system',
+  'virtual-machines',
+  'settings',
+] as const
 const WEB_RDP_PATHS: Readonly<Record<string, string>> = {
   win7: '/guacamole/#/client/MQBjAHBvc3RncmVzcWw',
   winXP: '/guacamole/#/client/MgBjAHBvc3RncmVzcWw',
@@ -189,6 +205,65 @@ function MachineRow(props: {
   )
 }
 
+function IdleSaveSettings({ minutes }: { minutes: number }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [value, setValue] = useState(String(minutes))
+  const parsedValue = Number(value)
+  const valid = /^\d+$/.test(value) && parsedValue >= 0 && parsedValue <= 1440
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateVirtualMachineSettings({ idle_save_minutes: parsedValue }),
+    onSuccess: async () => {
+      toast.success(t('Automatic save timeout updated'))
+      await queryClient.invalidateQueries({ queryKey: VM_SETTINGS_QUERY_KEY })
+    },
+  })
+
+  return (
+    <FieldGroup className='bg-muted/30 rounded-xl border p-3'>
+      <Field orientation='responsive' data-invalid={!valid || undefined}>
+        <div className='min-w-0 flex-1'>
+          <FieldLabel htmlFor='vm-idle-save-minutes'>
+            {t('Inactivity timeout (minutes)')}
+          </FieldLabel>
+          <FieldDescription>
+            {t(
+              'Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.'
+            )}
+          </FieldDescription>
+          {!valid && (
+            <FieldError>{t('Enter a whole number from 0 to 1440.')}</FieldError>
+          )}
+        </div>
+        <div className='flex w-full gap-2 @md/field-group:w-auto'>
+          <Input
+            id='vm-idle-save-minutes'
+            className='w-full @md/field-group:w-28'
+            type='number'
+            min={0}
+            max={1440}
+            step={1}
+            value={value}
+            aria-invalid={!valid}
+            onChange={(event) => setValue(event.target.value)}
+          />
+          <Button
+            type='button'
+            variant='outline'
+            disabled={!valid || mutation.isPending || parsedValue === minutes}
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending && <Spinner data-icon='inline-start' />}
+            {t('Save timeout')}
+          </Button>
+        </div>
+      </Field>
+    </FieldGroup>
+  )
+}
+
 export function VirtualMachinesPanel() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -201,6 +276,11 @@ export function VirtualMachinesPanel() {
     queryKey: VM_QUERY_KEY,
     queryFn: async () => (await getVirtualMachines()).data,
     refetchInterval: 5000,
+    retry: 1,
+  })
+  const settingsQuery = useQuery({
+    queryKey: VM_SETTINGS_QUERY_KEY,
+    queryFn: async () => (await getVirtualMachineSettings()).data,
     retry: 1,
   })
 
@@ -256,10 +336,16 @@ export function VirtualMachinesPanel() {
       </div>
 
       <div className='space-y-3 p-4 sm:p-5'>
-        {machinesQuery.isError && (
+        {(machinesQuery.isError || settingsQuery.isError) && (
           <div className='border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm'>
             {t('The host virtual machine agent is unavailable.')}
           </div>
+        )}
+        {settingsQuery.data && (
+          <IdleSaveSettings
+            key={settingsQuery.data.idle_save_minutes}
+            minutes={settingsQuery.data.idle_save_minutes}
+          />
         )}
         {machinesQuery.data?.map((machine) => (
           <MachineRow

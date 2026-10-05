@@ -5443,5 +5443,10 @@
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
     "Zoom": "ズーム"
-  }
+  },
+  "Automatic save timeout updated": "自動保存のタイムアウトを更新しました",
+  "Enter a whole number from 0 to 1440.": "0～1440 の整数を入力してください。",
+  "Inactivity timeout (minutes)": "未操作タイムアウト（分）",
+  "Save timeout": "タイムアウトを保存",
+  "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.": "0 にすると無効になります。実行中の Windows 仮想マシンは、RDP または基本コンソールの接続がない状態が指定時間続くと自動的に状態保存されます。"
 }

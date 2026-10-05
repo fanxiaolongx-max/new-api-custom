@@ -244,6 +244,10 @@ export interface VirtualMachine {
   cpu_count: number
 }
 
+export interface VirtualMachineSettings {
+  idle_save_minutes: number
+}
+
 export type VirtualMachineAction = 'start' | 'shutdown' | 'save' | 'poweroff'
 
 export async function getVirtualMachines() {
@@ -252,6 +256,26 @@ export async function getVirtualMachines() {
     data: VirtualMachine[]
     message?: string
   }>('/api/system/virtual-machines')
+  return res.data
+}
+
+export async function getVirtualMachineSettings() {
+  const res = await api.get<{
+    success: boolean
+    data: VirtualMachineSettings
+    message?: string
+  }>('/api/system/virtual-machines/settings')
+  return res.data
+}
+
+export async function updateVirtualMachineSettings(
+  settings: VirtualMachineSettings
+) {
+  const res = await api.put<{
+    success: boolean
+    data: VirtualMachineSettings
+    message?: string
+  }>('/api/system/virtual-machines/settings', settings)
   return res.data
 }
 

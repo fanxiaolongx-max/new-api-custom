@@ -39,6 +39,10 @@ type virtualMachineInputRequest struct {
 	Buttons   int    `json:"buttons"`
 }
 
+type virtualMachineSettingsRequest struct {
+	IdleSaveMinutes *int `json:"idle_save_minutes" binding:"required"`
+}
+
 func writeVirtualMachineError(c *gin.Context, err error) {
 	status := http.StatusBadGateway
 	if errors.Is(err, service.ErrVMAgentUnavailable) {
@@ -55,6 +59,32 @@ func ListVirtualMachines(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": machines})
+}
+
+func GetVirtualMachineSettings(c *gin.Context) {
+	settings, err := service.GetVirtualMachineSettings()
+	if err != nil {
+		writeVirtualMachineError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})
+}
+
+func UpdateVirtualMachineSettings(c *gin.Context) {
+	var request virtualMachineSettingsRequest
+	if err := c.ShouldBindJSON(&request); err != nil || request.IdleSaveMinutes == nil || *request.IdleSaveMinutes < 0 || *request.IdleSaveMinutes > 1440 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "idle save timeout must be between 0 and 1440 minutes"})
+		return
+	}
+	settings, err := service.UpdateVirtualMachineSettings(service.VirtualMachineSettings{
+		IdleSaveMinutes: *request.IdleSaveMinutes,
+	})
+	if err != nil {
+		writeVirtualMachineError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": settings})
 }
 
 func ControlVirtualMachine(c *gin.Context) {

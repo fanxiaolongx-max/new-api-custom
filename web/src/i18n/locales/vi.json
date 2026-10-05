@@ -5443,5 +5443,10 @@
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
     "Zoom": "Zoom"
-  }
+  },
+  "Automatic save timeout updated": "Đã cập nhật thời gian chờ tự động lưu",
+  "Enter a whole number from 0 to 1440.": "Nhập số nguyên từ 0 đến 1440.",
+  "Inactivity timeout (minutes)": "Thời gian không điều khiển (phút)",
+  "Save timeout": "Lưu thời gian chờ",
+  "Use 0 to disable. Running Windows machines are saved after this many minutes without an RDP or basic-console connection.": "Đặt là 0 để tắt. Máy ảo Windows đang chạy sẽ được lưu trạng thái sau số phút này nếu không có kết nối RDP hoặc bảng điều khiển cơ bản."
 }
