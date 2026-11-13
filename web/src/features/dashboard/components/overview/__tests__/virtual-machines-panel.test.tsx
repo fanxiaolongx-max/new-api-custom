@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -99,6 +99,24 @@ describe('virtual machine management', () => {
     })
   })
 
+  test('opens the Debian host desktop even while the virtual machine list is loading', () => {
+    getVirtualMachines.mockReturnValue(new Promise(() => {}))
+    const queryClient = renderPanel()
+
+    const desktop = screen.getByRole('button', { name: 'Debian desktop' })
+    expect(desktop).toHaveAttribute(
+      'href',
+      '/guacamole/#/client/NQBjAHBvc3RncmVzcWw'
+    )
+    expect(desktop).toHaveAttribute('target', '_blank')
+    expect(desktop).toHaveAttribute('rel', 'noreferrer')
+    expect(desktop.parentElement).toHaveClass('flex-wrap')
+    expect(desktop).not.toBeDisabled()
+    expect(controlVirtualMachine).not.toHaveBeenCalled()
+
+    queryClient.clear()
+  })
+
   test('offers start only for stopped machines and remote control for running machines', async () => {
     const queryClient = renderPanel()
 
@@ -119,6 +137,65 @@ describe('virtual machine management', () => {
       screen.getByRole('button', { name: 'Remote control' })
     ).toBeInTheDocument()
 
+    queryClient.clear()
+  })
+
+  test('opens running feiniu in the web SSH terminal and keeps the basic console available', async () => {
+    const user = userEvent.setup()
+    getVirtualMachines.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          name: 'feiniu',
+          state: 'running',
+          os_type: 'Fedora (64-bit)',
+          memory_mb: 2048,
+          cpu_count: 2,
+        },
+      ],
+    })
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('feiniu')).closest('article')
+    if (!row) throw new Error('feiniu row not found')
+
+    const remoteControl = within(row).getByRole('button', {
+      name: 'Remote control',
+    })
+    expect(remoteControl).toHaveAttribute(
+      'href',
+      '/guacamole/#/client/NABjAHBvc3RncmVzcWw'
+    )
+    expect(remoteControl).toHaveAttribute('target', '_blank')
+    await user.click(
+      within(row).getByRole('button', { name: 'Basic console mode' })
+    )
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Remote console: feiniu'
+    )
+    expect(controlVirtualMachine).not.toHaveBeenCalled()
+
+    queryClient.clear()
+  })
+
+  test('shows loading instead of an empty machine list while the first request is pending', async () => {
+    let finishLoading!: (result: { success: boolean; data: [] }) => void
+    const request = new Promise<{ success: boolean; data: [] }>((resolve) => {
+      finishLoading = resolve
+    })
+    getVirtualMachines.mockReturnValue(request)
+    const queryClient = renderPanel()
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading')
+    expect(
+      screen.queryByText('No managed virtual machines were found.')
+    ).not.toBeInTheDocument()
+
+    await act(async () => finishLoading({ success: true, data: [] }))
+
+    expect(
+      await screen.findByText('No managed virtual machines were found.')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     queryClient.clear()
   })
 
@@ -157,6 +234,117 @@ describe('virtual machine management', () => {
       idle_save_minutes: 45,
     })
 
+    queryClient.clear()
+  })
+
+  test('shows restore progress before Start and blocks duplicate commands until completion', async () => {
+    const user = userEvent.setup()
+    let finishCommand!: (result: { success: boolean }) => void
+    const command = new Promise<{ success: boolean }>((resolve) => {
+      finishCommand = resolve
+    })
+    controlVirtualMachine.mockReturnValue(command)
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('win7')).closest('article')
+    if (!row) throw new Error('win7 row not found')
+    const start = within(row).getByRole('button', { name: 'Start' })
+
+    await user.click(start)
+
+    const progress = within(row).getByRole('progressbar', {
+      name: 'Restoring saved state…',
+    })
+    expect(progress).not.toHaveAttribute('aria-valuenow')
+    expect(
+      progress.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(start).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Shut down' })).toBeDisabled()
+    await user.click(start)
+    expect(controlVirtualMachine).toHaveBeenCalledTimes(1)
+
+    getVirtualMachines.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          name: 'win7',
+          state: 'restoring',
+          os_type: 'Windows 7 (64-bit)',
+          memory_mb: 2048,
+          cpu_count: 2,
+        },
+      ],
+    })
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: ['system', 'virtual-machines'],
+        exact: true,
+      })
+    })
+    expect(within(row).getByRole('button', { name: 'Start' })).toBeDisabled()
+    expect(within(row).getByRole('progressbar')).toBeInTheDocument()
+    expect(within(row).queryByText('Unknown')).not.toBeInTheDocument()
+
+    getVirtualMachines.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          name: 'win7',
+          state: 'running',
+          os_type: 'Windows 7 (64-bit)',
+          memory_mb: 2048,
+          cpu_count: 2,
+        },
+      ],
+    })
+
+    await act(async () => finishCommand({ success: true }))
+    await waitFor(() =>
+      expect(within(row).queryByRole('progressbar')).not.toBeInTheDocument()
+    )
+    expect(
+      within(row).queryByRole('button', { name: 'Start' })
+    ).not.toBeInTheDocument()
+    expect(
+      within(row).getByRole('button', { name: 'Remote control' })
+    ).toBeInTheDocument()
+    queryClient.clear()
+  })
+
+  test('refreshes actual state after a timeout and shows uncertainty instead of claiming boot failure', async () => {
+    const user = userEvent.setup()
+    let failCommand!: (error: Error) => void
+    const command = new Promise<{ success: boolean }>((_, reject) => {
+      failCommand = reject
+    })
+    controlVirtualMachine.mockReturnValue(command)
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('win7')).closest('article')
+    if (!row) throw new Error('win7 row not found')
+    await user.click(within(row).getByRole('button', { name: 'Start' }))
+    getVirtualMachines.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          name: 'win7',
+          state: 'running',
+          os_type: 'Windows 7 (64-bit)',
+          memory_mb: 2048,
+          cpu_count: 2,
+        },
+      ],
+    })
+
+    await act(async () => failCommand(new Error('timeout')))
+
+    expect(await within(row).findByRole('alert')).toHaveTextContent(
+      'Command response failed. Refresh to confirm the virtual machine state.'
+    )
+    expect(await within(row).findByText('Running')).toBeInTheDocument()
+    expect(within(row).queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(
+      within(row).getByRole('button', { name: 'Remote control' })
+    ).toBeInTheDocument()
     queryClient.clear()
   })
 

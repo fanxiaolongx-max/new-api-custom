@@ -69,15 +69,17 @@ const VM_SETTINGS_QUERY_KEY = [
   'virtual-machines',
   'settings',
 ] as const
-const WEB_RDP_PATHS: Readonly<Record<string, string>> = {
+const WEB_CONSOLE_PATHS: Readonly<Record<string, string>> = {
   win7: '/guacamole/#/client/MQBjAHBvc3RncmVzcWw',
   winXP: '/guacamole/#/client/MgBjAHBvc3RncmVzcWw',
   win11: '/guacamole/#/client/MwBjAHBvc3RncmVzcWw',
+  feiniu: '/guacamole/#/client/NABjAHBvc3RncmVzcWw',
 }
 const ACTIVE_VM_STATES = new Set([
   'running',
   'paused',
   'starting',
+  'restoring',
   'stopping',
   'saving',
 ])
@@ -90,6 +92,8 @@ function stateLabelKey(state: string): string {
     paused: 'Paused',
     aborted: 'Aborted',
     error: 'Error',
+    starting: 'Starting virtual machine…',
+    restoring: 'Restoring saved state…',
   }
   return labels[state] ?? 'Unknown'
 }
@@ -97,17 +101,25 @@ function stateLabelKey(state: string): string {
 function MachineRow(props: {
   machine: VirtualMachine
   companionLocked: boolean
-  pending: boolean
+  pendingAction?: VirtualMachineAction
+  actionsDisabled: boolean
+  commandFailed: boolean
   onAction: (action: VirtualMachineAction) => void
   onConsole: () => void
   onForcePowerOff: () => void
 }) {
   const { t } = useTranslation()
-  const running = props.machine.state === 'running'
-  const webRDPPath = WEB_RDP_PATHS[props.machine.name]
+  const starting = props.pendingAction === 'start'
+  const running = props.machine.state === 'running' && !starting
+  const progressLabel =
+    props.machine.state === 'saved'
+      ? t('Restoring saved state…')
+      : t('Starting virtual machine…')
+  const webConsolePath = WEB_CONSOLE_PATHS[props.machine.name]
   const canStart =
-    ['powered_off', 'saved', 'aborted'].includes(props.machine.state) &&
-    !props.companionLocked
+    starting ||
+    (['powered_off', 'saved', 'aborted'].includes(props.machine.state) &&
+      !props.companionLocked)
 
   return (
     <article className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'>
@@ -136,12 +148,36 @@ function MachineRow(props: {
         </div>
       </div>
 
-      <div className='flex flex-wrap gap-2'>
+      <div className='flex min-w-0 flex-wrap items-center gap-2 lg:justify-end'>
+        {starting && (
+          <div
+            className='text-muted-foreground flex w-36 min-w-0 flex-col gap-1.5 text-xs'
+            role='status'
+          >
+            <span className='truncate' title={progressLabel}>
+              {progressLabel}
+            </span>
+            <div
+              className='bg-primary/15 h-1 w-full overflow-hidden rounded-full'
+              role='progressbar'
+              aria-label={progressLabel}
+            >
+              <div className='vm-start-shimmer via-primary motion-reduce:bg-primary h-full w-1/2 rounded-full bg-linear-to-r from-transparent to-transparent motion-reduce:animate-none' />
+            </div>
+          </div>
+        )}
+        {props.commandFailed && (
+          <p role='alert' className='text-destructive max-w-xs text-xs'>
+            {t(
+              'Command response failed. Refresh to confirm the virtual machine state.'
+            )}
+          </p>
+        )}
         {canStart && (
           <Button
             size='sm'
             onClick={() => props.onAction('start')}
-            disabled={props.pending}
+            disabled={props.actionsDisabled}
           >
             <Play data-icon='inline-start' />
             {t('Start')}
@@ -149,12 +185,12 @@ function MachineRow(props: {
         )}
         {running && (
           <>
-            {webRDPPath ? (
+            {webConsolePath ? (
               <>
                 <Button
                   size='sm'
                   render={
-                    <a href={webRDPPath} target='_blank' rel='noreferrer' />
+                    <a href={webConsolePath} target='_blank' rel='noreferrer' />
                   }
                   nativeButton={false}
                 >
@@ -175,7 +211,7 @@ function MachineRow(props: {
               variant='outline'
               size='sm'
               onClick={() => props.onAction('shutdown')}
-              disabled={props.pending}
+              disabled={props.actionsDisabled}
             >
               <Power data-icon='inline-start' />
               {t('Shut down')}
@@ -184,7 +220,7 @@ function MachineRow(props: {
               variant='outline'
               size='sm'
               onClick={() => props.onAction('save')}
-              disabled={props.pending}
+              disabled={props.actionsDisabled}
             >
               <Pause data-icon='inline-start' />
               {t('Save state')}
@@ -193,7 +229,7 @@ function MachineRow(props: {
               variant='ghost'
               size='sm'
               onClick={props.onForcePowerOff}
-              disabled={props.pending}
+              disabled={props.actionsDisabled}
             >
               <CircleStop data-icon='inline-start' />
               {t('Force power off')}
@@ -287,12 +323,19 @@ export function VirtualMachinesPanel() {
   const actionMutation = useMutation({
     mutationFn: (request: { name: string; action: VirtualMachineAction }) =>
       controlVirtualMachine(request.name, request.action),
-    onSuccess: async (_, request) => {
+    onSuccess: (_, request) => {
       toast.success(
         t('Virtual machine {{name}} command accepted', { name: request.name })
       )
-      await queryClient.invalidateQueries({ queryKey: VM_QUERY_KEY })
     },
+    onError: () => {
+      toast.error(
+        t(
+          'Command response failed. Refresh to confirm the virtual machine state.'
+        )
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: VM_QUERY_KEY }),
   })
 
   const runAction = (name: string, action: VirtualMachineAction) => {
@@ -307,7 +350,7 @@ export function VirtualMachinesPanel() {
 
   return (
     <section className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
-      <div className='flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5'>
+      <div className='flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5'>
         <div className='flex items-center gap-2.5'>
           <IconBadge tone='chart-4' size='sm'>
             <MonitorPlay className='size-4' aria-hidden='true' />
@@ -321,21 +364,47 @@ export function VirtualMachinesPanel() {
             </p>
           </div>
         </div>
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={() => machinesQuery.refetch()}
-          disabled={machinesQuery.isFetching}
-        >
-          <RefreshCw
-            data-icon='inline-start'
-            className={cn(machinesQuery.isFetching && 'animate-spin')}
-          />
-          {t('Refresh')}
-        </Button>
+        <div className='flex flex-wrap items-center gap-2'>
+          <Button
+            variant='outline'
+            size='sm'
+            render={
+              <a
+                href='/guacamole/#/client/NQBjAHBvc3RncmVzcWw'
+                target='_blank'
+                rel='noreferrer'
+              />
+            }
+            nativeButton={false}
+          >
+            <MonitorPlay data-icon='inline-start' />
+            {t('Debian desktop')}
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => machinesQuery.refetch()}
+            disabled={machinesQuery.isFetching}
+          >
+            <RefreshCw
+              data-icon='inline-start'
+              className={cn(machinesQuery.isFetching && 'animate-spin')}
+            />
+            {t('Refresh')}
+          </Button>
+        </div>
       </div>
 
       <div className='space-y-3 p-4 sm:p-5'>
+        {machinesQuery.isPending && (
+          <p
+            role='status'
+            className='text-muted-foreground flex items-center gap-2 text-sm'
+          >
+            <Spinner aria-hidden='true' />
+            {t('Loading')}
+          </p>
+        )}
         {(machinesQuery.isError || settingsQuery.isError) && (
           <div className='border-destructive/30 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm'>
             {t('The host virtual machine agent is unavailable.')}
@@ -352,8 +421,15 @@ export function VirtualMachinesPanel() {
             key={machine.name}
             machine={machine}
             companionLocked={machine.name === 'feiniu' && win11IsActive}
-            pending={
+            pendingAction={
               actionMutation.isPending &&
+              actionMutation.variables?.name === machine.name
+                ? actionMutation.variables.action
+                : undefined
+            }
+            actionsDisabled={actionMutation.isPending || machinesQuery.isError}
+            commandFailed={
+              actionMutation.isError &&
               actionMutation.variables?.name === machine.name
             }
             onAction={(action) => runAction(machine.name, action)}
@@ -361,7 +437,7 @@ export function VirtualMachinesPanel() {
             onForcePowerOff={() => setForcePowerOffMachine(machine.name)}
           />
         ))}
-        {!machinesQuery.isError && !machinesQuery.data?.length && (
+        {machinesQuery.isSuccess && machinesQuery.data.length === 0 && (
           <p className='text-muted-foreground text-sm'>
             {t('No managed virtual machines were found.')}
           </p>

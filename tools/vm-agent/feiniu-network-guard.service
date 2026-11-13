@@ -1,0 +1,14 @@
+[Unit]
+Description=Recover fnOS VirtualBox bridge after network failure
+After=network-online.target vboxdrv.service
+
+[Service]
+Type=oneshot
+User=dragon
+Group=dragon
+Environment=HOME=/home/dragon
+RuntimeDirectory=feiniu-network-guard
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/bin/python3 /home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/feiniu-network-guard.py
+TimeoutStartSec=75
+NoNewPrivileges=true

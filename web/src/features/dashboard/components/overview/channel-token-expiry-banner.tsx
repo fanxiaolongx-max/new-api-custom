@@ -22,10 +22,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  Clock,
-  KeyRound,
   ShieldAlert,
-  Sparkles,
   Zap,
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
@@ -61,11 +58,12 @@ export function ChannelTokenExpiryBanner() {
 
   const monitoredChannels = useMemo<MonitoredChannel[]>(() => {
     const rawData = channelsRes?.data
-    const channels: Channel[] = Array.isArray(rawData)
-      ? rawData
-      : Array.isArray((rawData as any)?.items)
-        ? (rawData as any).items
-        : []
+    let channels: Channel[] = []
+    if (Array.isArray(rawData)) {
+      channels = rawData
+    } else if (rawData && Array.isArray(rawData.items)) {
+      channels = rawData.items
+    }
 
     if (channels.length === 0) return []
 
@@ -84,7 +82,10 @@ export function ChannelTokenExpiryBanner() {
       const rA = rank[a.expiry.status]
       const rB = rank[b.expiry.status]
       if (rA !== rB) return rA - rB
-      return (a.expiry.expiresAt?.getTime() || 0) - (b.expiry.expiresAt?.getTime() || 0)
+      return (
+        (a.expiry.expiresAt?.getTime() || 0) -
+        (b.expiry.expiresAt?.getTime() || 0)
+      )
     })
   }, [channelsRes?.data])
 
@@ -102,15 +103,15 @@ export function ChannelTokenExpiryBanner() {
     [monitoredChannels]
   )
 
-  const hasUrgentIssues = expiredCount > 0 || expiringSoonCount > 0
-
   const handleOpenUpdate = (channel: Channel) => {
     setSelectedChannel(channel)
     setUpdateDialogOpen(true)
   }
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin_channels_token_monitor'] })
+    queryClient.invalidateQueries({
+      queryKey: ['admin_channels_token_monitor'],
+    })
   }
 
   if (monitoredChannels.length === 0) {
@@ -122,48 +123,55 @@ export function ChannelTokenExpiryBanner() {
       <CardStaggerItem
         className={cn(
           'relative overflow-hidden rounded-2xl border p-4 sm:p-5 shadow-sm transition-all',
-          expiredCount > 0
-            ? 'bg-destructive/[0.04] border-destructive/30'
-            : expiringSoonCount > 0
-              ? 'bg-amber-500/[0.04] border-amber-500/30'
-              : 'bg-card border-border/70'
+          expiredCount > 0 && 'bg-destructive/[0.04] border-destructive/30',
+          expiredCount === 0 &&
+            expiringSoonCount > 0 &&
+            'bg-amber-500/[0.04] border-amber-500/30',
+          expiredCount === 0 &&
+            expiringSoonCount === 0 &&
+            'bg-card border-border/70'
         )}
       >
         {/* Top Header */}
-        <div className='flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/50'>
+        <div className='border-border/50 flex flex-wrap items-center justify-between gap-3 border-b pb-3'>
           <div className='flex items-center gap-2.5'>
             <div
               className={cn(
                 'flex size-9 items-center justify-center rounded-xl border shadow-xs',
-                expiredCount > 0
-                  ? 'bg-destructive/10 border-destructive/30 text-destructive'
-                  : expiringSoonCount > 0
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
-                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                expiredCount > 0 &&
+                  'bg-destructive/10 border-destructive/30 text-destructive',
+                expiredCount === 0 &&
+                  expiringSoonCount > 0 &&
+                  'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400',
+                expiredCount === 0 &&
+                  expiringSoonCount === 0 &&
+                  'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
               )}
             >
-              {expiredCount > 0 ? (
-                <ShieldAlert className='size-5' />
-              ) : expiringSoonCount > 0 ? (
+              {expiredCount > 0 && <ShieldAlert className='size-5' />}
+              {expiredCount === 0 && expiringSoonCount > 0 && (
                 <AlertTriangle className='size-5' />
-              ) : (
+              )}
+              {expiredCount === 0 && expiringSoonCount === 0 && (
                 <CheckCircle2 className='size-5' />
               )}
             </div>
             <div>
               <div className='flex items-center gap-2'>
-                <h3 className='text-sm sm:text-base font-semibold tracking-tight text-foreground'>
+                <h3 className='text-foreground text-sm font-semibold tracking-tight sm:text-base'>
                   {t('Channel Credentials & Token Health')}
                 </h3>
-                {expiredCount > 0 ? (
-                  <span className='rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive'>
+                {expiredCount > 0 && (
+                  <span className='bg-destructive/15 text-destructive rounded-full px-2 py-0.5 text-xs font-semibold'>
                     {t('{{count}} Expired', { count: expiredCount })}
                   </span>
-                ) : expiringSoonCount > 0 ? (
+                )}
+                {expiredCount === 0 && expiringSoonCount > 0 && (
                   <span className='rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400'>
                     {t('{{count}} Expiring Soon', { count: expiringSoonCount })}
                   </span>
-                ) : (
+                )}
+                {expiredCount === 0 && expiringSoonCount === 0 && (
                   <span className='rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400'>
                     {t('All {{count}} Healthy', {
                       count: monitoredChannels.length,
@@ -171,7 +179,7 @@ export function ChannelTokenExpiryBanner() {
                   </span>
                 )}
               </div>
-              <p className='text-xs text-muted-foreground mt-0.5'>
+              <p className='text-muted-foreground mt-0.5 text-xs'>
                 {expiredCount > 0
                   ? t(
                       'OpenAI Web / AccessToken expired. Quick update to restore model requests.'
@@ -187,7 +195,7 @@ export function ChannelTokenExpiryBanner() {
             <Button
               size='sm'
               variant='outline'
-              className='h-8 text-xs gap-1'
+              className='h-8 gap-1 text-xs'
               render={<Link to='/channels' />}
             >
               <span>{t('All Channels')}</span>
@@ -197,64 +205,71 @@ export function ChannelTokenExpiryBanner() {
         </div>
 
         {/* Channel Cards Grid */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3'>
+        <div className='grid grid-cols-1 gap-3 pt-3 md:grid-cols-2 lg:grid-cols-3'>
           {monitoredChannels.map(({ channel, expiry }) => {
             const isExp = expiry.isExpired
             const isCrit = expiry.status === 'critical'
             const isWarn = expiry.status === 'warning'
+            let buttonVariant: 'outline' | 'destructive' | 'default' = 'outline'
+            if (isExp) buttonVariant = 'destructive'
+            else if (isCrit) buttonVariant = 'default'
 
             return (
               <div
                 key={channel.id}
                 className={cn(
                   'flex flex-col justify-between rounded-xl border p-3.5 transition-all',
-                  isExp
-                    ? 'bg-destructive/10 border-destructive/40 shadow-xs'
-                    : isCrit
-                      ? 'bg-amber-500/10 border-amber-500/40 shadow-xs'
-                      : isWarn
-                        ? 'bg-amber-500/5 border-amber-500/25'
-                        : 'bg-muted/30 border-border/60'
+                  isExp && 'bg-destructive/10 border-destructive/40 shadow-xs',
+                  !isExp &&
+                    isCrit &&
+                    'bg-amber-500/10 border-amber-500/40 shadow-xs',
+                  !isExp &&
+                    !isCrit &&
+                    isWarn &&
+                    'bg-amber-500/5 border-amber-500/25',
+                  !isExp && !isCrit && !isWarn && 'bg-muted/30 border-border/60'
                 )}
               >
                 <div>
-                  <div className='flex items-start justify-between gap-2 mb-1.5'>
+                  <div className='mb-1.5 flex items-start justify-between gap-2'>
                     <div className='min-w-0 flex-1'>
                       <div className='flex items-center gap-1.5'>
                         <span
                           className={cn(
                             'size-2 rounded-full shrink-0',
-                            isExp
-                              ? 'bg-destructive animate-pulse'
-                              : isCrit || isWarn
-                                ? 'bg-amber-500'
-                                : 'bg-emerald-500'
+                            isExp && 'bg-destructive animate-pulse',
+                            !isExp && (isCrit || isWarn) && 'bg-amber-500',
+                            !isExp && !isCrit && !isWarn && 'bg-emerald-500'
                           )}
                         />
-                        <span className='font-mono font-semibold text-xs text-foreground truncate'>
+                        <span className='text-foreground truncate font-mono text-xs font-semibold'>
                           {channel.name}
                         </span>
                       </div>
-                      <span className='text-[10px] text-muted-foreground font-mono'>
-                        ID #{channel.id} · {channel.models?.split(',')[0] || 'GPT'}
+                      <span className='text-muted-foreground font-mono text-[10px]'>
+                        ID #{channel.id} ·{' '}
+                        {channel.models?.split(',')[0] || 'GPT'}
                       </span>
                     </div>
 
                     <span
                       className={cn(
                         'px-2 py-0.5 rounded text-[11px] font-mono font-semibold whitespace-nowrap',
-                        isExp
-                          ? 'bg-destructive/20 text-destructive'
-                          : isCrit || isWarn
-                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                        isExp && 'bg-destructive/20 text-destructive',
+                        !isExp &&
+                          (isCrit || isWarn) &&
+                          'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+                        !isExp &&
+                          !isCrit &&
+                          !isWarn &&
+                          'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                       )}
                     >
                       {expiry.formattedRemaining}
                     </span>
                   </div>
 
-                  <div className='text-[11px] text-muted-foreground font-mono mt-1 space-y-0.5'>
+                  <div className='text-muted-foreground mt-1 space-y-0.5 font-mono text-[11px]'>
                     <div className='flex items-center justify-between'>
                       <span>{t('Expires At')}:</span>
                       <span>{expiry.formattedExpiry}</span>
@@ -262,17 +277,17 @@ export function ChannelTokenExpiryBanner() {
                     {expiry.email && (
                       <div className='flex items-center justify-between truncate'>
                         <span>{t('Account')}:</span>
-                        <span className='truncate ml-2'>{expiry.email}</span>
+                        <span className='ml-2 truncate'>{expiry.email}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className='pt-2.5 mt-2 border-t border-border/40 flex items-center justify-end'>
+                <div className='border-border/40 mt-2 flex items-center justify-end border-t pt-2.5'>
                   <Button
                     type='button'
                     size='sm'
-                    variant={isExp ? 'destructive' : isCrit ? 'default' : 'outline'}
+                    variant={buttonVariant}
                     className={cn(
                       'h-7 px-2.5 text-xs gap-1 font-medium shadow-xs',
                       !isExp &&
@@ -281,7 +296,10 @@ export function ChannelTokenExpiryBanner() {
                     )}
                     onClick={() => handleOpenUpdate(channel)}
                   >
-                    <Zap size={11} className={isExp ? 'text-white' : 'text-amber-400'} />
+                    <Zap
+                      size={11}
+                      className={isExp ? 'text-white' : 'text-amber-400'}
+                    />
                     <span>{t('Quick Update Token')}</span>
                   </Button>
                 </div>

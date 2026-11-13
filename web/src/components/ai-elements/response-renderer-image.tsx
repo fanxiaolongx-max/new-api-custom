@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { CheckIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, Maximize2Icon } from 'lucide-react'
+import { CheckIcon, CopyIcon, DownloadIcon, Maximize2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -29,7 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
 
 type ResponseImageProps = {
   node: ImageNode
@@ -95,7 +94,7 @@ export function ResponseImage(props: ResponseImageProps) {
 
   return (
     <>
-      <div className='group relative my-4 inline-block max-w-full overflow-hidden rounded-xl border border-border/80 bg-muted/20 shadow-xs transition-all hover:shadow-md'>
+      <div className='group border-border/80 bg-muted/20 relative my-4 inline-block max-w-full overflow-hidden rounded-xl border shadow-xs transition-all hover:shadow-md'>
         <img
           alt={props.node.alt || 'AI Generated Image'}
           className='block h-auto max-h-[500px] w-auto max-w-full cursor-zoom-in rounded-xl object-contain transition-transform duration-300 group-hover:scale-[1.01]'
@@ -107,9 +106,9 @@ export function ResponseImage(props: ResponseImageProps) {
         />
 
         {/* Hover Action Bar */}
-        <div className='absolute top-2 right-2 flex items-center gap-1 rounded-lg bg-background/80 p-1 shadow-xs backdrop-blur-md opacity-0 transition-opacity duration-200 group-hover:opacity-100'>
+        <div className='bg-background/80 absolute top-2 right-2 flex items-center gap-1 rounded-lg p-1 opacity-0 shadow-xs backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100'>
           <Button
-            className='size-7 text-muted-foreground hover:text-foreground'
+            className='text-muted-foreground hover:text-foreground size-7'
             onClick={() => setIsPreviewOpen(true)}
             size='icon'
             title={t('Preview')}
@@ -119,7 +118,7 @@ export function ResponseImage(props: ResponseImageProps) {
             <Maximize2Icon size={14} />
           </Button>
           <Button
-            className='size-7 text-muted-foreground hover:text-foreground'
+            className='text-muted-foreground hover:text-foreground size-7'
             onClick={handleCopy}
             size='icon'
             title={t('Copy image')}
@@ -133,7 +132,7 @@ export function ResponseImage(props: ResponseImageProps) {
             )}
           </Button>
           <Button
-            className='size-7 text-muted-foreground hover:text-foreground'
+            className='text-muted-foreground hover:text-foreground size-7'
             onClick={handleDownload}
             size='icon'
             title={t('Download image')}
@@ -149,7 +148,7 @@ export function ResponseImage(props: ResponseImageProps) {
       <Dialog onOpenChange={setIsPreviewOpen} open={isPreviewOpen}>
         <DialogContent className='max-w-4xl p-2 sm:p-4'>
           <DialogHeader className='px-2 pb-2'>
-            <DialogTitle className='text-sm font-medium truncate'>
+            <DialogTitle className='truncate text-sm font-medium'>
               {props.node.alt || t('AI Generated Image')}
             </DialogTitle>
           </DialogHeader>

@@ -1,0 +1,8 @@
+[Unit]
+Description=Recover fnOS network interface after gateway failure
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/feiniu-guest-network-guard
+TimeoutStartSec=20

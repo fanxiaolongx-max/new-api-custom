@@ -255,7 +255,7 @@ export async function getVirtualMachines() {
     success: boolean
     data: VirtualMachine[]
     message?: string
-  }>('/api/system/virtual-machines')
+  }>('/api/system/virtual-machines', { skipErrorHandler: true })
   return res.data
 }
 
@@ -264,7 +264,7 @@ export async function getVirtualMachineSettings() {
     success: boolean
     data: VirtualMachineSettings
     message?: string
-  }>('/api/system/virtual-machines/settings')
+  }>('/api/system/virtual-machines/settings', { skipErrorHandler: true })
   return res.data
 }
 
@@ -287,9 +287,13 @@ export async function controlVirtualMachine(
     success: boolean
     data: VirtualMachine
     message?: string
-  }>(`/api/system/virtual-machines/${encodeURIComponent(name)}/action`, {
-    action,
-  })
+  }>(
+    `/api/system/virtual-machines/${encodeURIComponent(name)}/action`,
+    {
+      action,
+    },
+    { skipErrorHandler: true, timeout: 185000 }
+  )
   return res.data
 }
 

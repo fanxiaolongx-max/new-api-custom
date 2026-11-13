@@ -1,0 +1,24 @@
+[Unit]
+Description=VirtualBox management service for new-api virtual machines
+After=vboxdrv.service
+
+[Service]
+Type=forking
+User=dragon
+Group=dragon
+Environment=HOME=/home/dragon
+RuntimeDirectory=new-api-vboxsvc
+RuntimeDirectoryMode=0755
+PIDFile=/run/new-api-vboxsvc/manager.pid
+# Start outside the agent's NoNewPrivileges sandbox: VirtualBox's supported
+# setuid launcher needs to initialize the host virtualization driver.
+ExecStart=/usr/lib/virtualbox/VBoxSVC --daemonize --pidfile=/run/new-api-vboxsvc/manager.pid
+# VBoxSVC's daemon launcher returns 126 after handing off to the child.
+SuccessExitStatus=126
+Restart=on-failure
+RestartSec=3
+KillMode=process
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

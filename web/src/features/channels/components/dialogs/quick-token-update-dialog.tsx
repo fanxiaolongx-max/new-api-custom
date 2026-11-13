@@ -23,7 +23,6 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
-  RefreshCw,
   Sparkles,
   Trash2,
   Zap,
@@ -112,7 +111,9 @@ export function QuickTokenUpdateDialog({
       // 1. Update channel token with clean extracted token
       const updateRes = await updateChannel(channel.id, { key: tokenToSave })
       if (!updateRes.success) {
-        throw new Error(updateRes.message || t('Failed to update channel token'))
+        throw new Error(
+          updateRes.message || t('Failed to update channel token')
+        )
       }
 
       toast.success(t('Channel token updated successfully!'))
@@ -171,17 +172,17 @@ export function QuickTokenUpdateDialog({
         </div>
       }
       description={
-        <div className='flex items-center gap-2 mt-1 text-xs text-muted-foreground'>
+        <div className='text-muted-foreground mt-1 flex items-center gap-2 text-xs'>
           <span>{t('Channel')}:</span>
-          <span className='font-mono font-semibold text-foreground'>
+          <span className='text-foreground font-mono font-semibold'>
             {channel.name}
           </span>
-          <span className='text-[11px] px-1.5 py-0.5 rounded bg-muted font-mono'>
+          <span className='bg-muted rounded px-1.5 py-0.5 font-mono text-[11px]'>
             #{channel.id}
           </span>
         </div>
       }
-      className='max-w-xl'
+      contentClassName='max-w-xl'
     >
       <div className='flex flex-col gap-4 py-1'>
         {/* Current Token Status Card */}
@@ -189,14 +190,17 @@ export function QuickTokenUpdateDialog({
           <div
             className={cn(
               'rounded-xl border p-3 text-xs transition-colors',
-              currentExpiry.isExpired
-                ? 'bg-destructive/10 border-destructive/30 text-destructive'
-                : currentExpiry.status === 'critical'
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
-                  : 'bg-muted/40 border-border/60 text-muted-foreground'
+              currentExpiry.isExpired &&
+                'bg-destructive/10 border-destructive/30 text-destructive',
+              !currentExpiry.isExpired &&
+                currentExpiry.status === 'critical' &&
+                'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400',
+              !currentExpiry.isExpired &&
+                currentExpiry.status !== 'critical' &&
+                'bg-muted/40 border-border/60 text-muted-foreground'
             )}
           >
-            <div className='flex items-center justify-between font-medium mb-1'>
+            <div className='mb-1 flex items-center justify-between font-medium'>
               <div className='flex items-center gap-1.5'>
                 {currentExpiry.isExpired ? (
                   <AlertCircle size={14} className='text-destructive' />
@@ -209,7 +213,7 @@ export function QuickTokenUpdateDialog({
                 {currentExpiry.formattedRemaining}
               </span>
             </div>
-            <div className='flex flex-wrap items-center justify-between gap-2 text-[11px] opacity-90 font-mono'>
+            <div className='flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] opacity-90'>
               <span>
                 {t('Expires At')}: {currentExpiry.formattedExpiry}
               </span>
@@ -221,7 +225,7 @@ export function QuickTokenUpdateDialog({
         {/* Input Area */}
         <div className='flex flex-col gap-2'>
           <div className='flex items-center justify-between'>
-            <label className='text-xs font-medium flex items-center gap-1.5'>
+            <label className='flex items-center gap-1.5 text-xs font-medium'>
               <KeyRound size={13} className='text-primary' />
               <span>{t('New AccessToken / Key')}</span>
             </label>
@@ -232,7 +236,7 @@ export function QuickTokenUpdateDialog({
                   variant='ghost'
                   size='sm'
                   onClick={() => setNewToken('')}
-                  className='h-6 px-2 text-[11px] text-muted-foreground hover:text-destructive'
+                  className='text-muted-foreground hover:text-destructive h-6 px-2 text-[11px]'
                 >
                   <Trash2 size={11} className='mr-1' />
                   {t('Clear')}
@@ -255,18 +259,21 @@ export function QuickTokenUpdateDialog({
             value={newToken}
             onChange={(e) => setNewToken(e.target.value)}
             placeholder='可直接粘贴整个 https://chatgpt.com/api/auth/session 返回的全部 JSON 内容，或单独粘贴 AccessToken...'
-            className='min-h-[100px] font-mono text-xs leading-relaxed resize-y'
+            className='min-h-[100px] resize-y font-mono text-xs leading-relaxed'
           />
         </div>
 
         {/* JSON Extraction Badge */}
         {isJsonExtracted && (
-          <div className='flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 border border-primary/25 rounded-lg px-3 py-1.5'>
-            <Sparkles size={13} className='text-amber-500 shrink-0' />
+          <div className='text-primary bg-primary/10 border-primary/25 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium'>
+            <Sparkles size={13} className='shrink-0 text-amber-500' />
             <span>
-              {t('Smart Recognition: Extracted accessToken ({{len}} chars) from Session JSON successfully!', {
-                len: cleanToken.length,
-              })}
+              {t(
+                'Smart Recognition: Extracted accessToken ({{len}} chars) from Session JSON successfully!',
+                {
+                  len: cleanToken.length,
+                }
+              )}
             </span>
           </div>
         )}
@@ -276,16 +283,19 @@ export function QuickTokenUpdateDialog({
           <div
             className={cn(
               'rounded-xl border p-3 text-xs',
-              newExpiry.isJwt
-                ? newExpiry.isExpired
-                  ? 'bg-destructive/10 border-destructive/30 text-destructive'
-                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-muted/50 border-border text-muted-foreground'
+              newExpiry.isJwt &&
+                newExpiry.isExpired &&
+                'bg-destructive/10 border-destructive/30 text-destructive',
+              newExpiry.isJwt &&
+                !newExpiry.isExpired &&
+                'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400',
+              !newExpiry.isJwt &&
+                'bg-muted/50 border-border text-muted-foreground'
             )}
           >
             {newExpiry.isJwt ? (
               <div>
-                <div className='flex items-center gap-1.5 font-semibold mb-1'>
+                <div className='mb-1 flex items-center gap-1.5 font-semibold'>
                   <Sparkles size={13} />
                   <span>
                     {newExpiry.isExpired
@@ -293,7 +303,7 @@ export function QuickTokenUpdateDialog({
                       : t('Valid OpenAI AccessToken parsed!')}
                   </span>
                 </div>
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] font-mono opacity-90 mt-1'>
+                <div className='mt-1 grid grid-cols-1 gap-1 font-mono text-[11px] opacity-90 sm:grid-cols-2'>
                   <div>
                     {t('Valid Until')}: {newExpiry.formattedExpiry}
                   </div>
@@ -308,7 +318,7 @@ export function QuickTokenUpdateDialog({
                 </div>
               </div>
             ) : (
-              <div className='text-[11px] text-muted-foreground'>
+              <div className='text-muted-foreground text-[11px]'>
                 {t('Standard Key format detected (length: {{len}} chars)', {
                   len: cleanToken.length,
                 })}
@@ -318,39 +328,42 @@ export function QuickTokenUpdateDialog({
         )}
 
         {/* How to get AccessToken helper */}
-        <div className='rounded-xl border border-dashed border-border/80 bg-muted/25 p-3 text-xs text-muted-foreground space-y-1.5'>
-          <div className='font-semibold text-foreground flex items-center justify-between'>
+        <div className='border-border/80 bg-muted/25 text-muted-foreground space-y-1.5 rounded-xl border border-dashed p-3 text-xs'>
+          <div className='text-foreground flex items-center justify-between font-semibold'>
             <span>{t('💡 极速获取 AccessToken 步骤：')}</span>
             <a
               href='https://chatgpt.com/api/auth/session'
               target='_blank'
               rel='noreferrer'
-              className='inline-flex items-center gap-1 text-primary hover:underline text-[11px] font-medium'
+              className='text-primary inline-flex items-center gap-1 text-[11px] font-medium hover:underline'
             >
               <span>{t('打开官方 Session 链接')}</span>
               <ExternalLink size={11} />
             </a>
           </div>
-          <ol className='list-decimal list-inside space-y-1 text-[11px] leading-relaxed'>
-            <li>{t('在浏览器登录 chatgpt.com 后，访问：')}{' '}
+          <ol className='list-inside list-decimal space-y-1 text-[11px] leading-relaxed'>
+            <li>
+              {t('在浏览器登录 chatgpt.com 后，访问：')}{' '}
               <a
                 href='https://chatgpt.com/api/auth/session'
                 target='_blank'
                 rel='noreferrer'
-                className='text-primary underline font-mono select-all'
+                className='text-primary font-mono underline select-all'
               >
                 https://chatgpt.com/api/auth/session
               </a>
             </li>
             <li>
               {t('直接按 ')}
-              <kbd className='bg-muted px-1 py-0.5 rounded font-mono text-[10px] text-foreground font-semibold'>
+              <kbd className='bg-muted text-foreground rounded px-1 py-0.5 font-mono text-[10px] font-semibold'>
                 Ctrl+A
               </kbd>{' '}
               {t('或全选并复制页面上的全部 JSON 内容（无需手动寻找 token）')}
             </li>
             <li>
-              {t('直接粘贴到上方输入框，系统将自动提取 accessToken 并解析，点击「保存并生效」即可！')}
+              {t(
+                '直接粘贴到上方输入框，系统将自动提取 accessToken 并解析，点击「保存并生效」即可！'
+              )}
             </li>
           </ol>
         </div>
@@ -383,7 +396,7 @@ export function QuickTokenUpdateDialog({
       </div>
 
       {/* Footer Actions */}
-      <div className='flex items-center justify-end gap-2 pt-2 border-t mt-2'>
+      <div className='mt-2 flex items-center justify-end gap-2 border-t pt-2'>
         <Button
           type='button'
           variant='ghost'

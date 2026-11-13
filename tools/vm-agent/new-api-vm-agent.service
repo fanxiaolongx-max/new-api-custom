@@ -1,6 +1,7 @@
 [Unit]
 Description=Restricted VirtualBox agent for new-api dashboard
-After=vboxdrv.service
+After=vboxdrv.service new-api-vboxsvc.service
+Wants=new-api-vboxsvc.service
 
 [Service]
 Type=simple
@@ -12,7 +13,7 @@ Environment=VM_AGENT_VMS=winXP,win7,win11,feiniu
 Environment=VM_AGENT_WINDOWS_VM=win11
 Environment=VM_AGENT_COMPANION_VM=feiniu
 Environment=VM_AGENT_WINDOWS_CPUS=4
-Environment=VM_AGENT_WINDOWS_MEMORY_MB=8192
+Environment=VM_AGENT_WINDOWS_MEMORY_MB=4096
 Environment=VM_AGENT_IDLE_SAVE_VMS=winXP,win7,win11
 Environment=VM_AGENT_IDLE_SAVE_MINUTES=30
 RuntimeDirectory=new-api-vm-agent

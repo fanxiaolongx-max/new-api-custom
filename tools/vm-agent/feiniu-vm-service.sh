@@ -18,6 +18,7 @@ vm_state=$(
 case "${1:-}" in
   start)
     if [ "$vm_state" != "running" ]; then
+      /usr/bin/python3 /home/dragon/Documents/antigravity/eager-hypatia/tools/vm-agent/feiniu-network-guard.py --prepare-start
       /usr/bin/VBoxManage startvm "$vm_name" --type headless
     fi
     ;;

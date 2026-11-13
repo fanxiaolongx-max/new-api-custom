@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -101,7 +102,12 @@ func callVMAgent(method string, path string, requestBody any) (*http.Response, e
 	if requestBody != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	response, err := vmAgentClientFactory().Do(request)
+	client := vmAgentClientFactory()
+	if method == http.MethodPost && strings.HasSuffix(path, "/action") {
+		// Saving a companion VM and restoring Windows can exceed a status poll.
+		client.Timeout = 3 * time.Minute
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrVMAgentUnavailable, err)
 	}

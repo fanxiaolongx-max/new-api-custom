@@ -143,3 +143,6 @@ export type ViewMode = (typeof VIEW_MODES)[keyof typeof VIEW_MODES]
 
 /** Default page size for pricing table */
 export const DEFAULT_PRICING_PAGE_SIZE = 20
+
+/** Default page size for pricing card grid (divisible by 2 and 3 for responsive grid) */
+export const DEFAULT_PRICING_CARD_PAGE_SIZE = 18

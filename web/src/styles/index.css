@@ -30,6 +30,19 @@ For commercial licensing, please contact support@quantumnous.com
 @import './theme.css';
 @import './theme-presets.css';
 
+@keyframes vm-start-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}
+
+@utility vm-start-shimmer {
+  animation: vm-start-shimmer 1.4s ease-in-out infinite;
+}
+
 /* Shiki dual themes: token colors follow dark theme (pre background stays `bg-background` on the block) */
 @layer components {
   .shiki span {

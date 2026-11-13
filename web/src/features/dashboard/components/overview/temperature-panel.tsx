@@ -22,7 +22,6 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
-  Flame,
   HardDrive,
   RotateCw,
   Thermometer,
@@ -49,7 +48,10 @@ import {
 } from '@/features/dashboard/api'
 import { cn } from '@/lib/utils'
 
-function getTempTone(temp: number, type: 'cpu' | 'nvme' | 'pch'): {
+function getTempTone(
+  temp: number,
+  type: 'cpu' | 'nvme' | 'pch'
+): {
   textClass: string
   dotClass: string
   badgeTone: IconBadgeTone
@@ -71,7 +73,7 @@ function getTempTone(temp: number, type: 'cpu' | 'nvme' | 'pch'): {
     return {
       textClass: 'text-rose-500 font-semibold',
       dotClass: 'bg-rose-500 animate-pulse',
-      badgeTone: 'danger',
+      badgeTone: 'destructive',
       statusTextKey: 'Warm',
     }
   }
@@ -108,21 +110,26 @@ export function TemperaturePanel() {
 
   const data: TemperatureOverview | undefined = tempQuery.data
   const loading = tempQuery.isLoading
-  const current: TemperaturePoint = data?.current ?? {
-    timestamp: 0,
-    time_str: '--',
-    cpu: 0,
-    nvme: 0,
-    pch: 0,
-  }
+  const current = useMemo<TemperaturePoint>(
+    () =>
+      data?.current ?? {
+        timestamp: 0,
+        time_str: '--',
+        cpu: 0,
+        nvme: 0,
+        pch: 0,
+      },
+    [data]
+  )
 
   const history = useMemo(() => {
-    const rawList =
-      data?.history && data.history.length > 0
-        ? data.history
-        : current.cpu > 0 || current.nvme > 0 || current.pch > 0
-          ? [current]
-          : []
+    let rawList = data?.history ?? []
+    if (
+      rawList.length === 0 &&
+      (current.cpu > 0 || current.nvme > 0 || current.pch > 0)
+    ) {
+      rawList = [current]
+    }
 
     return rawList.map((item) => {
       let localTimeStr = item.time_str
@@ -143,7 +150,9 @@ export function TemperaturePanel() {
   const nvmeTone = getTempTone(current.nvme, 'nvme')
   const pchTone = getTempTone(current.pch, 'pch')
 
-  const hasSensors = Boolean(data?.available && (current.cpu > 0 || current.nvme > 0 || current.pch > 0))
+  const hasSensors = Boolean(
+    data?.available && (current.cpu > 0 || current.nvme > 0 || current.pch > 0)
+  )
 
   return (
     <section className='bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
@@ -154,7 +163,7 @@ export function TemperaturePanel() {
           </IconBadge>
           <h3 className='text-sm font-semibold'>{t('Hardware Temperature')}</h3>
           <span className='inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400'>
-            <span className='size-1.5 rounded-full bg-emerald-500 animate-pulse' />
+            <span className='size-1.5 animate-pulse rounded-full bg-emerald-500' />
             {t('Live')}
           </span>
         </div>
@@ -164,7 +173,7 @@ export function TemperaturePanel() {
             <Button
               variant='ghost'
               size='sm'
-              className='h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground'
+              className='text-muted-foreground hover:text-foreground h-7 gap-1 px-2 text-xs'
               onClick={() => setShowSensorsDetail(!showSensorsDetail)}
             >
               {showSensorsDetail ? (
@@ -175,7 +184,9 @@ export function TemperaturePanel() {
               ) : (
                 <>
                   <ChevronDown className='size-3.5' />
-                  <span>{t('Sensors')} ({data.sensors.length})</span>
+                  <span>
+                    {t('Sensors')} ({data.sensors.length})
+                  </span>
                 </>
               )}
             </Button>
@@ -183,12 +194,14 @@ export function TemperaturePanel() {
           <Button
             variant='ghost'
             size='icon'
-            className='size-7 text-muted-foreground hover:text-foreground'
+            className='text-muted-foreground hover:text-foreground size-7'
             onClick={() => void tempQuery.refetch()}
             disabled={tempQuery.isFetching}
             title={t('Refresh')}
           >
-            <RotateCw className={cn('size-3.5', tempQuery.isFetching && 'animate-spin')} />
+            <RotateCw
+              className={cn('size-3.5', tempQuery.isFetching && 'animate-spin')}
+            />
           </Button>
         </div>
       </div>
@@ -233,26 +246,38 @@ export function TemperaturePanel() {
 
         {/* 传感器详情折叠列表 */}
         {showSensorsDetail && data?.sensors && data.sensors.length > 0 && (
-          <div className='rounded-xl border bg-muted/20 p-3.5 space-y-2.5'>
-            <div className='flex items-center justify-between text-[11px] font-medium text-muted-foreground'>
-              <span>{t('Detected Hardware Sensors')} ({data.sensors.length})</span>
-              <span className='text-[10px] text-muted-foreground/70'>Linux hwmon / thermal_zone</span>
+          <div className='bg-muted/20 space-y-2.5 rounded-xl border p-3.5'>
+            <div className='text-muted-foreground flex items-center justify-between text-[11px] font-medium'>
+              <span>
+                {t('Detected Hardware Sensors')} ({data.sensors.length})
+              </span>
+              <span className='text-muted-foreground/70 text-[10px]'>
+                Linux hwmon / thermal_zone
+              </span>
             </div>
             <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3'>
-              {data.sensors.map((sensor, idx) => (
+              {data.sensors.map((sensor) => (
                 <div
-                  key={`${sensor.name}-${sensor.label}-${idx}`}
-                  className='flex items-center justify-between gap-2 rounded-lg border bg-background/80 px-3 py-2 text-xs shadow-2xs hover:bg-muted/30 transition-colors'
+                  key={`${sensor.name}-${sensor.label}-${sensor.display_name}`}
+                  className='bg-background/80 hover:bg-muted/30 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs shadow-2xs transition-colors'
                 >
-                  <div className='flex flex-col min-w-0 pr-1'>
-                    <span className='font-medium text-[12px] text-foreground truncate' title={sensor.display_name || sensor.label || sensor.name}>
+                  <div className='flex min-w-0 flex-col pr-1'>
+                    <span
+                      className='text-foreground truncate text-[12px] font-medium'
+                      title={sensor.display_name || sensor.label || sensor.name}
+                    >
                       {sensor.display_name || sensor.label || sensor.name}
                     </span>
-                    <span className='font-mono text-[10px] text-muted-foreground/70 truncate' title={`${sensor.name}: ${sensor.label}`}>
-                      {sensor.label && sensor.label !== sensor.display_name ? sensor.label : sensor.name}
+                    <span
+                      className='text-muted-foreground/70 truncate font-mono text-[10px]'
+                      title={`${sensor.name}: ${sensor.label}`}
+                    >
+                      {sensor.label && sensor.label !== sensor.display_name
+                        ? sensor.label
+                        : sensor.name}
                     </span>
                   </div>
-                  <span className='font-mono font-semibold text-sm tabular-nums text-foreground shrink-0'>
+                  <span className='text-foreground shrink-0 font-mono text-sm font-semibold tabular-nums'>
                     {sensor.temp_c.toFixed(1)}°C
                   </span>
                 </div>
@@ -264,10 +289,10 @@ export function TemperaturePanel() {
         {/* 历史趋势曲线图 */}
         <div>
           <div className='mb-2 flex items-center justify-between'>
-            <span className='text-xs font-medium text-muted-foreground'>
+            <span className='text-muted-foreground text-xs font-medium'>
               {t('Temperature Trend')} ({history.length} {t('points')})
             </span>
-            <div className='flex items-center gap-3 text-[11px] font-mono'>
+            <div className='flex items-center gap-3 font-mono text-[11px]'>
               <span className='inline-flex items-center gap-1 text-rose-500'>
                 <span className='size-2 rounded-full bg-rose-500' />
                 CPU
@@ -283,27 +308,53 @@ export function TemperaturePanel() {
             </div>
           </div>
 
-          {loading ? (
-            <Skeleton className='h-36 w-full rounded-xl' />
-          ) : history.length > 0 ? (
+          {loading && <Skeleton className='h-36 w-full rounded-xl' />}
+          {!loading && history.length > 0 && (
             <div className='h-36 w-full'>
               <ResponsiveContainer width='100%' height='100%'>
-                <AreaChart data={history} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+                <AreaChart
+                  data={history}
+                  margin={{ top: 8, right: 8, left: -24, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id='cpuGrad' x1='0' y1='0' x2='0' y2='1'>
-                      <stop offset='5%' stopColor='#f43f5e' stopOpacity={0.35} />
-                      <stop offset='95%' stopColor='#f43f5e' stopOpacity={0.0} />
+                      <stop
+                        offset='5%'
+                        stopColor='#f43f5e'
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset='95%'
+                        stopColor='#f43f5e'
+                        stopOpacity={0.0}
+                      />
                     </linearGradient>
                     <linearGradient id='nvmeGrad' x1='0' y1='0' x2='0' y2='1'>
-                      <stop offset='5%' stopColor='#10b981' stopOpacity={0.35} />
-                      <stop offset='95%' stopColor='#10b981' stopOpacity={0.0} />
+                      <stop
+                        offset='5%'
+                        stopColor='#10b981'
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset='95%'
+                        stopColor='#10b981'
+                        stopOpacity={0.0}
+                      />
                     </linearGradient>
                     <linearGradient id='pchGrad' x1='0' y1='0' x2='0' y2='1'>
                       <stop offset='5%' stopColor='#f59e0b' stopOpacity={0.3} />
-                      <stop offset='95%' stopColor='#f59e0b' stopOpacity={0.0} />
+                      <stop
+                        offset='95%'
+                        stopColor='#f59e0b'
+                        stopOpacity={0.0}
+                      />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray='3 3' vertical={false} opacity={0.15} />
+                  <CartesianGrid
+                    strokeDasharray='3 3'
+                    vertical={false}
+                    opacity={0.15}
+                  />
                   <XAxis
                     dataKey='time_str'
                     tickLine={false}
@@ -352,9 +403,11 @@ export function TemperaturePanel() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <div className='flex h-36 items-center justify-center rounded-xl border border-dashed text-xs text-muted-foreground'>
-              {data?.message || t('No temperature history yet. Recording in progress...')}
+          )}
+          {!loading && history.length === 0 && (
+            <div className='text-muted-foreground flex h-36 items-center justify-center rounded-xl border border-dashed text-xs'>
+              {data?.message ||
+                t('No temperature history yet. Recording in progress...')}
             </div>
           )}
         </div>
@@ -376,17 +429,17 @@ function TempCard(props: {
 }) {
   const Icon = props.icon
   return (
-    <div className='bg-muted/40 rounded-xl p-3 sm:px-4 sm:py-3 transition-colors'>
+    <div className='bg-muted/40 rounded-xl p-3 transition-colors sm:px-4 sm:py-3'>
       <div className='flex items-center justify-between gap-1'>
-        <div className='flex items-center gap-1.5 text-muted-foreground text-[11px] font-medium truncate'>
+        <div className='text-muted-foreground flex items-center gap-1.5 truncate text-[11px] font-medium'>
           <IconBadge tone={props.tone} size='xs'>
             <Icon />
           </IconBadge>
           <span className='truncate'>{props.label}</span>
         </div>
-        <span className='inline-flex items-center gap-1 shrink-0'>
+        <span className='inline-flex shrink-0 items-center gap-1'>
           <span className={cn('size-1.5 rounded-full', props.dotClass)} />
-          <span className='text-[10px] text-muted-foreground font-medium hidden sm:inline'>
+          <span className='text-muted-foreground hidden text-[10px] font-medium sm:inline'>
             {props.statusText}
           </span>
         </span>
@@ -395,7 +448,12 @@ function TempCard(props: {
       {props.loading ? (
         <Skeleton className='mt-2 h-6 w-16' />
       ) : (
-        <div className={cn('mt-2 font-mono text-lg font-bold tracking-tight tabular-nums', props.textClass)}>
+        <div
+          className={cn(
+            'mt-2 font-mono text-lg font-bold tracking-tight tabular-nums',
+            props.textClass
+          )}
+        >
           {props.value}
         </div>
       )}
@@ -403,7 +461,11 @@ function TempCard(props: {
   )
 }
 
-function CustomTooltip({ active, payload, label }: {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
   active?: boolean
   payload?: Array<{ name: string; value: number; color: string }>
   label?: string
@@ -411,18 +473,26 @@ function CustomTooltip({ active, payload, label }: {
   if (!active || !payload || payload.length === 0) return null
 
   return (
-    <div className='rounded-xl border bg-background/95 p-2.5 shadow-md backdrop-blur text-xs'>
-      <div className='font-mono font-medium text-muted-foreground mb-1.5'>
+    <div className='bg-background/95 rounded-xl border p-2.5 text-xs shadow-md backdrop-blur'>
+      <div className='text-muted-foreground mb-1.5 font-mono font-medium'>
         {label}
       </div>
       <div className='space-y-1 font-mono'>
         {payload.map((entry) => (
-          <div key={entry.name} className='flex items-center justify-between gap-3'>
+          <div
+            key={entry.name}
+            className='flex items-center justify-between gap-3'
+          >
             <span className='flex items-center gap-1.5'>
-              <span className='size-2 rounded-full' style={{ backgroundColor: entry.color }} />
+              <span
+                className='size-2 rounded-full'
+                style={{ backgroundColor: entry.color }}
+              />
               <span>{entry.name}:</span>
             </span>
-            <span className='font-semibold tabular-nums'>{entry.value ? `${entry.value.toFixed(1)}°C` : '--'}</span>
+            <span className='font-semibold tabular-nums'>
+              {entry.value ? `${entry.value.toFixed(1)}°C` : '--'}
+            </span>
           </div>
         ))}
       </div>

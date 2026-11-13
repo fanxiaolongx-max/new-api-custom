@@ -11,14 +11,14 @@ import json
 import os
 import socket
 import subprocess
+import sys
 import tempfile
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from socketserver import ThreadingMixIn
 from urllib.parse import unquote, urlparse
-
-from vboxapi import VirtualBoxManager
-
 
 SOCKET_PATH = os.environ.get("VM_AGENT_SOCKET", "/run/new-api-vm-agent/agent.sock")
 VBOX_MANAGE = os.environ.get("VBOX_MANAGE", "/usr/bin/VBoxManage")
@@ -31,7 +31,8 @@ MAX_BODY_BYTES = 16 * 1024
 WINDOWS_VM = os.environ.get("VM_AGENT_WINDOWS_VM", "win11")
 COMPANION_VM = os.environ.get("VM_AGENT_COMPANION_VM", "feiniu")
 WINDOWS_VM_CPUS = int(os.environ.get("VM_AGENT_WINDOWS_CPUS", "4"))
-WINDOWS_VM_MEMORY_MB = int(os.environ.get("VM_AGENT_WINDOWS_MEMORY_MB", "8192"))
+# Keep Win11 at 4 GiB on this host, including with older service environments.
+WINDOWS_VM_MEMORY_MB = 4096
 IDLE_SAVE_VMS = tuple(
     name.strip()
     for name in os.environ.get("VM_AGENT_IDLE_SAVE_VMS", "winXP,win7,win11").split(",")
@@ -51,11 +52,13 @@ LIFECYCLE_MARKER = Path(
         "/run/new-api-vm-agent/feiniu-saved-for-win11",
     )
 )
-ACTIVE_STATES = {"running", "paused", "starting", "stopping", "saving"}
+ACTIVE_STATES = {"running", "paused", "starting", "restoring", "stopping", "saving"}
 
 STATE_NAMES = {
     "poweroff": "powered_off",
     "saved": "saved",
+    # VirtualBox keeps a resumable state file after an interrupted restore.
+    "aborted-saved": "saved",
     "running": "running",
     "paused": "paused",
     "aborted": "aborted",
@@ -78,7 +81,7 @@ def run_vbox(*args: str, timeout: int = 20) -> str:
 
 
 def machine_readable_values(name: str) -> dict[str, str]:
-    output = run_vbox("showvminfo", name, "--machinereadable")
+    output = run_vbox("showvminfo", name, "--machinereadable", timeout=5)
     values: dict[str, str] = {}
     for line in output.splitlines():
         key, separator, value = line.partition("=")
@@ -86,6 +89,16 @@ def machine_readable_values(name: str) -> dict[str, str]:
             continue
         values[key] = value.strip().strip('"')
     return values
+
+
+def start_machine(name: str) -> None:
+    """Select the available fnOS LAN bridge before starting or restoring it."""
+    if name == COMPANION_VM:
+        subprocess.run(
+            ["/usr/bin/python3", str(Path(__file__).with_name("feiniu-network-guard.py")), "--prepare-start"],
+            check=True, capture_output=True, text=True, timeout=40,
+        )
+    run_vbox("startvm", name, "--type", "headless", timeout=30)
 
 
 def machine_info(name: str) -> dict[str, object]:
@@ -179,7 +192,7 @@ def restore_companion_after_windows() -> None:
         return
     state = machine_info(COMPANION_VM)["state"]
     if state == "saved":
-        run_vbox("startvm", COMPANION_VM, "--type", "headless", timeout=30)
+        start_machine(COMPANION_VM)
         state = machine_info(COMPANION_VM)["state"]
     if state in ACTIVE_STATES:
         LIFECYCLE_MARKER.unlink(missing_ok=True)
@@ -216,11 +229,13 @@ def configure_windows_resources(info: dict[str, object]) -> None:
     )
 
 
-class UnixHTTPServer(HTTPServer):
+class UnixHTTPServer(ThreadingMixIn, HTTPServer):
     address_family = socket.AF_UNIX
+    daemon_threads = True
 
     def __init__(self, socket_path: str, handler: type[BaseHTTPRequestHandler]) -> None:
-        self.vbox_manager = VirtualBoxManager(None, None)
+        self.control_lock = threading.Lock()
+        self.settings_lock = threading.Lock()
         self.next_lifecycle_check = time.monotonic()
         self.idle_save_minutes = load_idle_save_minutes()
         self.last_control_activity = {
@@ -236,8 +251,9 @@ class UnixHTTPServer(HTTPServer):
 
     def update_idle_save_minutes(self, minutes: int) -> None:
         minutes = validate_idle_save_minutes(minutes)
-        persist_idle_save_minutes(minutes)
-        self.idle_save_minutes = minutes
+        with self.settings_lock:
+            persist_idle_save_minutes(minutes)
+            self.idle_save_minutes = minutes
 
     def reconcile_idle_saves(self) -> None:
         now = time.monotonic()
@@ -283,22 +299,29 @@ class UnixHTTPServer(HTTPServer):
     def server_close(self) -> None:
         socket_path = Path(self.server_address)
         super().server_close()
-        self.vbox_manager.deinit()
         if socket_path.exists():
             socket_path.unlink()
 
     def service_actions(self) -> None:
         if time.monotonic() < self.next_lifecycle_check:
             return
-        self.next_lifecycle_check = time.monotonic() + 2
+        if not self.control_lock.acquire(blocking=False):
+            return
+        threading.Thread(target=self.reconcile_in_background, daemon=True).start()
+
+    def reconcile_in_background(self) -> None:
         try:
-            reconcile_vm_lifecycle()
-        except Exception as exc:
-            print(f"vm-agent: lifecycle reconciliation failed: {exc}", flush=True)
-        try:
-            self.reconcile_idle_saves()
-        except Exception as exc:
-            print(f"vm-agent: idle-save reconciliation failed: {exc}", flush=True)
+            try:
+                reconcile_vm_lifecycle()
+            except Exception as exc:
+                print(f"vm-agent: lifecycle reconciliation failed: {exc}", flush=True)
+            try:
+                self.reconcile_idle_saves()
+            except Exception as exc:
+                print(f"vm-agent: idle-save reconciliation failed: {exc}", flush=True)
+        finally:
+            self.next_lifecycle_check = time.monotonic() + 5
+            self.control_lock.release()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -313,8 +336,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # A client can disconnect while VirtualBox is still working.
 
     def read_json(self) -> dict[str, object]:
         try:
@@ -346,7 +372,6 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             if urlparse(self.path).path == "/v1/vms":
-                reconcile_vm_lifecycle()
                 self.send_json(200, {"vms": [machine_info(name) for name in ALLOWED_VMS]})
                 return
 
@@ -399,7 +424,13 @@ class Handler(BaseHTTPRequestHandler):
             payload = self.read_json()
 
             if suffix == "action":
-                self.handle_action(name, payload)
+                if not self.server.control_lock.acquire(timeout=10):
+                    self.send_json(409, {"error": "VirtualBox is busy; refresh the machine state before retrying"})
+                    return
+                try:
+                    self.handle_action(name, payload)
+                finally:
+                    self.server.control_lock.release()
                 return
             if suffix == "keyboard":
                 self.handle_keyboard(name, payload)
@@ -430,7 +461,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if name == WINDOWS_VM:
                     configure_windows_resources(info)
-                run_vbox("startvm", name, "--type", "headless", timeout=30)
+                start_machine(name)
                 self.server.mark_control_activity(name)
             except Exception:
                 if name == WINDOWS_VM and companion_saved:
@@ -450,7 +481,6 @@ class Handler(BaseHTTPRequestHandler):
             run_vbox("controlvm", name, "poweroff", timeout=30)
         else:
             raise ValueError("unsupported action")
-        reconcile_vm_lifecycle()
         self.send_json(200, {"vm": machine_info(name)})
 
     def handle_keyboard(self, name: str, payload: dict[str, object]) -> None:
@@ -489,16 +519,17 @@ class Handler(BaseHTTPRequestHandler):
         if machine_info(name)["state"] != "running":
             raise ValueError("virtual machine is not running")
 
-        session = None
-        try:
-            manager = self.server.vbox_manager
-            machine = manager.getVirtualBox().findMachine(name)
-            session = manager.openMachineSession(machine, fPermitSharing=True)
-            session.console.mouse.putMouseEventAbsolute(x, y, 0, 0, buttons)
-            self.server.mark_control_activity(name)
-        finally:
-            if session is not None:
-                manager.closeMachineSession(session)
+        # SDK initialization can hang along with VBoxSVC. Bound its lifetime so
+        # a console request cannot block the agent's startup or leak COM sessions.
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("vm_mouse.py")), name, str(x), str(y), str(buttons)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(completed.stderr.strip() or "VirtualBox mouse input failed")
+        self.server.mark_control_activity(name)
         self.send_json(200, {"success": True})
 
 
@@ -507,7 +538,6 @@ def main() -> None:
         raise SystemExit("VM_AGENT_VMS must contain at least one VM")
     with UnixHTTPServer(SOCKET_PATH, Handler) as server:
         print(f"vm-agent: listening on {SOCKET_PATH} for {', '.join(ALLOWED_VMS)}", flush=True)
-        reconcile_vm_lifecycle()
         server.serve_forever()
 
 

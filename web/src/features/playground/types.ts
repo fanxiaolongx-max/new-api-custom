@@ -104,6 +104,7 @@ export interface ChatCompletionRequest {
   seed?: number
   tools?: Array<{ type: string; [key: string]: any }>
   web_search?: boolean
+  web_search_options?: { search_context_size: 'low' | 'medium' | 'high' }
 }
 
 export interface ChatCompletionChunk {
