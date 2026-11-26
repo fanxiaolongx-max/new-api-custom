@@ -99,3 +99,15 @@ func TestUpdateVirtualMachineSettingsForwardsTimeoutAndReturnsAppliedValue(t *te
 	require.NoError(t, err)
 	assert.Equal(t, 45, settings.IdleSaveMinutes)
 }
+
+func TestVirtualMachineScreenshotPreservesStoppedGuestStatus(t *testing.T) {
+	withVMAgentFixture(t, func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusConflict, Body: io.NopCloser(strings.NewReader(`{"error":"virtual machine is not running"}`))}, nil
+	})
+	_, err := GetVirtualMachineScreenshot("openEuler")
+	require.Error(t, err)
+	var agentError *VMAgentResponseError
+	require.ErrorAs(t, err, &agentError)
+	assert.Equal(t, http.StatusConflict, agentError.Status)
+	assert.Equal(t, "virtual machine is not running", agentError.Error())
+}

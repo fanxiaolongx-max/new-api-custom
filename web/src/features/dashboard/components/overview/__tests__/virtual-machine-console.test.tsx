@@ -47,6 +47,27 @@ describe('virtual machine pointer control', () => {
     })
   })
 
+  test('a stopped guest response displays a useful state instead of a generic gateway error', async () => {
+    getScreenshot.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 409 },
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+    })
+    const view = render(
+      <QueryClientProvider client={queryClient}>
+        <VirtualMachineConsole machineName='openEuler' onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+    expect(
+      await screen.findByText(
+        'Virtual machine is not running. Start it before opening the console.'
+      )
+    ).toBeInTheDocument()
+    view.unmount()
+    queryClient.clear()
+  })
   test('does not send ordinary hover movement and sends a pointer press', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

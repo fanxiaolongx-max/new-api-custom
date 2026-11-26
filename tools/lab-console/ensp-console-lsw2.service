@@ -1,0 +1,11 @@
+[Unit]
+Description=Dragon Lab SW2 interactive eNSP console on private Docker bridge
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 -I /home/dragon/Documents/antigravity/eager-hypatia/tools/lab-console/ensp-console-proxy.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

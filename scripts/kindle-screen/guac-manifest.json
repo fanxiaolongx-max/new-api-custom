@@ -1,0 +1,6 @@
+{
+  "guacamoleVersion": "1.6.0",
+  "name": "Kindle SSH terminal",
+  "namespace": "kindle-terminal",
+  "authProviders": ["local.terminal.SystemSshAuthenticationProvider"]
+}

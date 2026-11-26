@@ -81,3 +81,10 @@ go.work.sum
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# 本机部署覆盖、临时配置备份及 Kindle 打包副本
+/docker-compose.override.yml
+/gateway/nginx.conf.before-*
+/kindle-dragonapi/
+/kindle-dragonapi-complete.zip
+/kindle-dragonapi-source.zip

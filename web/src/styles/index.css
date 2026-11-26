@@ -731,3 +731,9 @@ For commercial licensing, please contact support@quantumnous.com
     display: none;
   }
 }
+
+/* Keep keyboard navigation visible on the deployment topology. */
+.dragon-lab .lab-link-label:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}

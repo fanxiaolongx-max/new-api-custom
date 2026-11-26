@@ -572,4 +572,6 @@ export const STATIC_I18N_KEYS = [
   'This user account is disabled.',
   'Telegram binding failed. Please try again.',
   'Verification scope is missing',
+  'Dragon Lab only (full control)',
+  'Show only Dragon Lab and allow its configuration, consoles, scripts, and factory reset.',
 ] as const

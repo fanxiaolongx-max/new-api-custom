@@ -35,3 +35,16 @@ curl --unix-socket /run/new-api-vm-agent/agent.sock http://localhost/v1/settings
 curl --unix-socket /run/new-api-vm-agent/agent.sock http://localhost/v1/vms
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/vm-agent -p test_vm_agent.py
 ```
+
+The openEuler training iBMC panel and COM1 configuration are documented in
+[`docs/ibmc-simulator.md`](../../docs/ibmc-simulator.md). Keep the HTTP agent
+running while the interactive UART is configured so it can drain boot output.
+
+`VM_AGENT_REQUIRE_MANAGED_SERVICE=1` prevents the HTTP agent from launching an
+unmanaged auto-shutdown VBoxSVC while systemd is recovering the manager. The unit
+sets this flag; the agent checks the managed PID and process identity before any
+CLI or mouse SDK command. VBoxManage and mouse SDK processes share one lock so
+status polling, framebuffer capture and input do not overlap XPCOM sessions.
+A VirtualBox 7.2.10 manager segmentation fault was observed during concurrent
+console requests; this serialization reduces that exposure but does not replace
+a vendor fix. Never restart VBoxSVC while a VM is running.

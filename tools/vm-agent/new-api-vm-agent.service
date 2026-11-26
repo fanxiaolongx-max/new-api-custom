@@ -8,8 +8,9 @@ Type=simple
 User=dragon
 Group=dragon
 Environment=HOME=/home/dragon
+Environment=VM_AGENT_REQUIRE_MANAGED_SERVICE=1
 Environment=VM_AGENT_SOCKET=/run/new-api-vm-agent/agent.sock
-Environment=VM_AGENT_VMS=winXP,win7,win11,feiniu
+Environment=VM_AGENT_VMS=winXP,win7,win11,feiniu,openEuler
 Environment=VM_AGENT_WINDOWS_VM=win11
 Environment=VM_AGENT_COMPANION_VM=feiniu
 Environment=VM_AGENT_WINDOWS_CPUS=4

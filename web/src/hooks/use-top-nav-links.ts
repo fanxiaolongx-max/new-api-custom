@@ -20,6 +20,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
+import { isDragonLabOnlyUser } from '@/lib/dragon-lab-access'
 import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -60,11 +61,14 @@ export function useTopNavLinks(): TopNavLink[] {
 
   const isAuthed = !!auth?.user
 
+  if (isDragonLabOnlyUser(auth.user)) {
+    return [{ title: t('Dragon Lab'), href: '/' }]
+  }
   const links: TopNavLink[] = []
 
   // Home
   if (modules?.home !== false) {
-    links.push({ title: t('Home'), href: '/' })
+    links.push({ title: t('Dragon Lab'), href: '/' })
   }
 
   // Console -> /dashboard (new console path)

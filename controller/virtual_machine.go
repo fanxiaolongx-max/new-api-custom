@@ -45,6 +45,13 @@ type virtualMachineSettingsRequest struct {
 
 func writeVirtualMachineError(c *gin.Context, err error) {
 	status := http.StatusBadGateway
+	var agentError *service.VMAgentResponseError
+	if errors.As(err, &agentError) {
+		switch agentError.Status {
+		case http.StatusBadRequest, http.StatusNotFound, http.StatusConflict, http.StatusTooManyRequests, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			status = agentError.Status
+		}
+	}
 	if errors.Is(err, service.ErrVMAgentUnavailable) {
 		status = http.StatusServiceUnavailable
 	}

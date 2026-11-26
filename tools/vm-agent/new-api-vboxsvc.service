@@ -18,6 +18,7 @@ SuccessExitStatus=126
 Restart=on-failure
 RestartSec=3
 KillMode=process
+TimeoutStartSec=10
 TimeoutStopSec=60
 
 [Install]

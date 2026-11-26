@@ -1,0 +1,81 @@
+import { api } from '@/lib/api'
+
+export interface IBMCStatus {
+  name: string
+  simulation: boolean
+  state: string
+  uuid: string
+  memory_mb: number
+  cpu_count: number
+  firmware: string
+  os: string
+  state_changed: string
+  boot: string[]
+  nic: string
+  mac: string
+  serial: boolean
+  serial_busy: boolean
+  uid: boolean
+  alarm: string
+  media: { id: string; size: number }[]
+  mounted_media: string
+  snapshots: { id: string; name: string }[]
+  events: {
+    id: string
+    time: number
+    action: string
+    success: boolean
+    detail: string
+  }[]
+  inventory: Record<string, string>
+}
+export interface IBMCAction {
+  action:
+    | 'start'
+    | 'shutdown'
+    | 'poweroff'
+    | 'reset'
+    | 'save'
+    | 'pause'
+    | 'resume'
+    | 'boot'
+    | 'mount'
+    | 'eject'
+    | 'snapshot'
+    | 'uid'
+    | 'alarm'
+  device?: string
+  media?: string
+  enabled?: boolean
+  severity?: string
+}
+export async function getIBMC(): Promise<IBMCStatus> {
+  const response = await api.get<{ data: IBMCStatus }>('/api/system/ibmc', {
+    skipErrorHandler: true,
+  })
+  return response.data.data
+}
+export async function controlIBMC(action: IBMCAction) {
+  await api.post('/api/system/ibmc/action', action)
+}
+export async function serialIBMC(request: {
+  operation: 'open' | 'write' | 'close'
+  auto_login?: boolean
+  session?: string
+  data?: string
+}): Promise<{ session: string; cursor: number }> {
+  const response = await api.post<{
+    data: { session: string; cursor: number }
+  }>('/api/system/ibmc/serial', request, { skipErrorHandler: true })
+  return response.data.data
+}
+export async function readIBMCSerial(session: string, cursor: number) {
+  const response = await api.get<{
+    data: { cursor: number; data: string; truncated: boolean }
+  }>('/api/system/ibmc/serial', {
+    params: { cursor },
+    headers: { 'X-IBMC-Session': session },
+    skipErrorHandler: true,
+  })
+  return response.data.data
+}

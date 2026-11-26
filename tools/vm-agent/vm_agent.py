@@ -8,6 +8,8 @@ against fixed allowlists before invoking VBoxManage or the local VirtualBox SDK.
 from __future__ import annotations
 
 import json
+
+from ibmc import IBMC
 import os
 import socket
 import subprocess
@@ -24,7 +26,7 @@ SOCKET_PATH = os.environ.get("VM_AGENT_SOCKET", "/run/new-api-vm-agent/agent.soc
 VBOX_MANAGE = os.environ.get("VBOX_MANAGE", "/usr/bin/VBoxManage")
 ALLOWED_VMS = tuple(
     name.strip()
-    for name in os.environ.get("VM_AGENT_VMS", "winXP,win7,win11,feiniu").split(",")
+    for name in os.environ.get("VM_AGENT_VMS", "winXP,win7,win11,feiniu,openEuler").split(",")
     if name.strip()
 )
 MAX_BODY_BYTES = 16 * 1024
@@ -66,14 +68,30 @@ STATE_NAMES = {
 }
 
 
+VBOX_COMMAND_LOCK = threading.RLock()
+
+
+def ensure_managed_service() -> None:
+    if os.environ.get("VM_AGENT_REQUIRE_MANAGED_SERVICE") != "1":
+        return
+    try:
+        pid = int(Path("/run/new-api-vboxsvc/manager.pid").read_text().strip())
+        if Path(f"/proc/{pid}/comm").read_text().strip() != "VBoxSVC":
+            raise ValueError("stale PID")
+    except (OSError, ValueError) as exc:
+        raise RuntimeError("VirtualBox management service is restarting") from exc
+
+
 def run_vbox(*args: str, timeout: int = 20) -> str:
-    completed = subprocess.run(
-        [VBOX_MANAGE, *args],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    with VBOX_COMMAND_LOCK:
+        ensure_managed_service()
+        completed = subprocess.run(
+            [VBOX_MANAGE, *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
     if completed.returncode != 0:
         message = completed.stderr.strip() or completed.stdout.strip()
         raise RuntimeError(message or "VirtualBox command failed")
@@ -87,7 +105,7 @@ def machine_readable_values(name: str) -> dict[str, str]:
         key, separator, value = line.partition("=")
         if not separator:
             continue
-        values[key] = value.strip().strip('"')
+        values[key.strip('"')] = value.strip().strip('"')
     return values
 
 
@@ -235,6 +253,8 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
 
     def __init__(self, socket_path: str, handler: type[BaseHTTPRequestHandler]) -> None:
         self.control_lock = threading.Lock()
+        self.ibmc = IBMC(run_vbox, machine_readable_values)
+        self.ibmc.serial.start()
         self.settings_lock = threading.Lock()
         self.next_lifecycle_check = time.monotonic()
         self.idle_save_minutes = load_idle_save_minutes()
@@ -297,6 +317,7 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
         os.chmod(socket_path, 0o660)
 
     def server_close(self) -> None:
+        self.ibmc.serial.stop()
         socket_path = Path(self.server_address)
         super().server_close()
         if socket_path.exists():
@@ -328,7 +349,8 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "new-api-vm-agent/1"
 
     def log_message(self, fmt: str, *args: object) -> None:
-        print(f"vm-agent: {fmt % args}", flush=True)
+        if "/v1/ibmc/serial" not in self.path:
+            print(f"vm-agent: {fmt % args}", flush=True)
 
     def send_json(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -366,6 +388,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
+            if urlparse(self.path).path == "/v1/ibmc":
+                self.send_json(200, self.server.ibmc.status())
+                return
+            if urlparse(self.path).path == "/v1/ibmc/serial":
+                from urllib.parse import parse_qs
+                query = parse_qs(urlparse(self.path).query)
+                self.send_json(200, self.server.ibmc.serial.request({"operation": "read", "session": query.get("session", [""])[0], "cursor": int(query.get("cursor", ["0"])[0])}))
+                return
             if urlparse(self.path).path == "/v1/settings":
                 self.send_json(
                     200, {"idle_save_minutes": self.server.idle_save_minutes}
@@ -417,6 +447,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         try:
+            path = urlparse(self.path).path
+            if path == "/v1/ibmc/action":
+                payload = self.read_json()
+                if not self.server.control_lock.acquire(timeout=10):
+                    self.send_json(409, {"error": "VirtualBox is busy"})
+                    return
+                try:
+                    self.send_json(200, self.server.ibmc.action(payload))
+                finally:
+                    self.server.control_lock.release()
+                return
+            if path == "/v1/ibmc/serial":
+                payload = self.read_json()
+                if payload.get("operation") == "open":
+                    result = self.server.ibmc.serial.open(auto_login=payload.get("auto_login") is True)
+                else:
+                    result = self.server.ibmc.serial.request(payload)
+                self.send_json(200, result)
+                return
             name, suffix = self.route()
             if name is None:
                 self.send_json(404, {"error": "not found"})
@@ -521,12 +570,14 @@ class Handler(BaseHTTPRequestHandler):
 
         # SDK initialization can hang along with VBoxSVC. Bound its lifetime so
         # a console request cannot block the agent's startup or leak COM sessions.
-        completed = subprocess.run(
-            [sys.executable, str(Path(__file__).with_name("vm_mouse.py")), name, str(x), str(y), str(buttons)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        with VBOX_COMMAND_LOCK:
+            ensure_managed_service()
+            completed = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("vm_mouse.py")), name, str(x), str(y), str(buttons)],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
         if completed.returncode != 0:
             raise RuntimeError(completed.stderr.strip() or "VirtualBox mouse input failed")
         self.server.mark_control_activity(name)

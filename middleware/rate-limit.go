@@ -263,3 +263,10 @@ func SearchRateLimit() func(c *gin.Context) {
 	}
 	return userRateLimitFactory(common.SearchRateLimitNum, common.SearchRateLimitDuration, "SR")
 }
+
+// IBMCSerialRateLimit is a separate per-administrator terminal budget. A serial
+// session polls output and batches keystrokes more often than ordinary API calls.
+// This limiter must follow RootAuth; terminal routes also require a login session.
+func IBMCSerialRateLimit() func(c *gin.Context) {
+	return userRateLimitFactory(1200, 60, "IBMC_SOL")
+}

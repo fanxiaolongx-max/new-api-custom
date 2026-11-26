@@ -41,6 +41,7 @@ import {
   clearAuthentication,
 } from '@/lib/auth-session'
 import { subscribeAuthSessionEvents } from '@/lib/auth-session-sync'
+import { dragonLabRedirect } from '@/lib/dragon-lab-access'
 import { resolveLegacyRoute } from '@/lib/legacy-route'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -175,6 +176,11 @@ export const Route = createRootRouteWithContext<{
     } else {
       await authBootstrap
     }
+    const labTarget = dragonLabRedirect(
+      useAuthStore.getState().auth.user,
+      pathname
+    )
+    if (labTarget) throw redirect({ to: labTarget, replace: true })
   },
   component: RootComponent,
   notFoundComponent: NotFoundError,

@@ -65,6 +65,7 @@ import { ApiInfoPanel } from './api-info-panel'
 import { ChannelTokenExpiryBanner } from './channel-token-expiry-banner'
 import { FAQPanel } from './faq-panel'
 import { HostMetricsPanel } from './host-metrics-panel'
+import { ONTMonitorPanel } from './ont-monitor-panel'
 import { PerformanceHealthPanel } from './performance-health-panel'
 import { ServicesHubPanel } from './services-hub-panel'
 import { SummaryCards } from './summary-cards'
@@ -785,9 +786,14 @@ export function OverviewDashboard() {
                     <HostMetricsPanel />
                   </CardStaggerItem>
                   {isRoot && (
-                    <CardStaggerItem className='lg:col-span-2'>
-                      <VirtualMachinesPanel />
-                    </CardStaggerItem>
+                    <>
+                      <CardStaggerItem className='lg:col-span-2'>
+                        <VirtualMachinesPanel />
+                      </CardStaggerItem>
+                      <CardStaggerItem className='lg:col-span-2'>
+                        <ONTMonitorPanel />
+                      </CardStaggerItem>
+                    </>
                   )}
                   <CardStaggerItem className='lg:col-span-2'>
                     <PerformanceHealthPanel />

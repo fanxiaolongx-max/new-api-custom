@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { isAxiosError } from 'axios'
 import { Keyboard, MousePointer2, RefreshCw } from 'lucide-react'
 import {
   type KeyboardEvent,
@@ -78,9 +79,9 @@ export function VirtualMachineConsole(props: VirtualMachineConsoleProps) {
     queryKey: ['virtual-machines', props.machineName, 'screenshot'],
     queryFn: () => getVirtualMachineScreenshot(props.machineName ?? ''),
     enabled: Boolean(props.machineName),
-    refetchInterval: (query) =>
-      query.state.status === 'error' ? false : 1000,
-    retry: 1,
+    refetchInterval: (query) => (query.state.status === 'error' ? false : 1000),
+    retry: (count, error) =>
+      !(isAxiosError(error) && error.response?.status === 409) && count < 1,
   })
 
   const screenshotUrl = useMemo(() => {
@@ -144,15 +145,22 @@ export function VirtualMachineConsole(props: VirtualMachineConsoleProps) {
     }
   }
 
+  const stopped =
+    isAxiosError(screenshotQuery.error) &&
+    screenshotQuery.error.response?.status === 409
   const emptyScreen = screenshotQuery.isError ? (
     <div className='max-w-xl space-y-2 px-6 text-center'>
       <p className='font-medium'>
         {t('Unable to load the virtual machine screen')}
       </p>
       <p className='text-muted-foreground text-sm'>
-        {t(
-          'The VirtualBox display is unavailable. If an RDP session is active, use Remote control or disconnect RDP and retry.'
-        )}
+        {stopped
+          ? t(
+              'Virtual machine is not running. Start it before opening the console.'
+            )
+          : t(
+              'The VirtualBox display is unavailable. If an RDP session is active, use Remote control or disconnect RDP and retry.'
+            )}
       </p>
     </div>
   ) : (
@@ -211,7 +219,7 @@ export function VirtualMachineConsole(props: VirtualMachineConsoleProps) {
           onKeyDown={handleKeyDown}
           className='focus-visible:ring-ring bg-muted flex min-h-72 items-center justify-center overflow-hidden rounded-lg border outline-none focus-visible:ring-2'
         >
-          {screenshotUrl ? (
+          {screenshotUrl && !screenshotQuery.isError ? (
             <img
               ref={imageRef}
               src={screenshotUrl}

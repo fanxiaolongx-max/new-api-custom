@@ -1,0 +1,25 @@
+services:
+  kindle-terminal:
+    image: guacamole/guacamole:1.6.0
+    container_name: guacamole-kindle-terminal
+    restart: unless-stopped
+    environment:
+      GUACD_HOSTNAME: guacd
+      WEBAPP_CONTEXT: kindle-terminal
+      JAVA_OPTS: -Xms32m -Xmx128m
+      BAN_ENABLED: "true"
+      BAN_MAX_INVALID_ATTEMPTS: "5"
+      BAN_ADDRESS_DURATION: "300"
+      REMOTE_IP_VALVE_ENABLED: "true"
+    volumes:
+      - ${HOME}/.local/share/kindle-dashboard-access/kindle-auth.jar:/etc/guacamole/extensions/system-ssh-auth.jar:ro
+    networks:
+      - existing
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 192
+networks:
+  existing:
+    external: true
+    name: eager-hypatia_default

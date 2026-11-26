@@ -55,6 +55,14 @@ type vmActionResponse struct {
 	VM VirtualMachine `json:"vm"`
 }
 
+// VMAgentResponseError preserves expected host statuses such as a stopped VM.
+type VMAgentResponseError struct {
+	Status  int
+	Message string
+}
+
+func (err *VMAgentResponseError) Error() string { return err.Message }
+
 type vmAgentError struct {
 	Error string `json:"error"`
 }
@@ -126,7 +134,7 @@ func decodeVMAgentResponse(response *http.Response, target any) error {
 	if err := common.DecodeJson(response.Body, &agentError); err != nil || agentError.Error == "" {
 		return fmt.Errorf("virtual machine agent returned status %d", response.StatusCode)
 	}
-	return errors.New(agentError.Error)
+	return &VMAgentResponseError{Status: response.StatusCode, Message: agentError.Error}
 }
 
 func ListVirtualMachines() ([]VirtualMachine, error) {
@@ -190,7 +198,7 @@ func GetVirtualMachineScreenshot(name string) ([]byte, error) {
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		var agentError vmAgentError
 		if err := common.DecodeJson(response.Body, &agentError); err == nil && agentError.Error != "" {
-			return nil, errors.New(agentError.Error)
+			return nil, &VMAgentResponseError{Status: response.StatusCode, Message: agentError.Error}
 		}
 		return nil, fmt.Errorf("virtual machine agent returned status %d", response.StatusCode)
 	}

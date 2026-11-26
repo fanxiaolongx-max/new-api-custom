@@ -24,8 +24,9 @@ import {
   Play,
   Power,
   RefreshCw,
+  Terminal,
 } from 'lucide-react'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -61,7 +62,10 @@ import {
 } from '@/features/dashboard/api'
 import { cn } from '@/lib/utils'
 
+import { KindleScreen } from './kindle-screen'
 import { VirtualMachineConsole } from './virtual-machine-console'
+
+const IBMCPanel = lazy(() => import('./ibmc-panel'))
 
 const VM_QUERY_KEY = ['system', 'virtual-machines'] as const
 const VM_SETTINGS_QUERY_KEY = [
@@ -74,6 +78,7 @@ const WEB_CONSOLE_PATHS: Readonly<Record<string, string>> = {
   winXP: '/guacamole/#/client/MgBjAHBvc3RncmVzcWw',
   win11: '/guacamole/#/client/MwBjAHBvc3RncmVzcWw',
   feiniu: '/guacamole/#/client/NABjAHBvc3RncmVzcWw',
+  openEuler: '/guacamole/#/client/NgBjAHBvc3RncmVzcWw',
 }
 const ACTIVE_VM_STATES = new Set([
   'running',
@@ -303,7 +308,9 @@ function IdleSaveSettings({ minutes }: { minutes: number }) {
 export function VirtualMachinesPanel() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [ibmcOpen, setIbmcOpen] = useState(false)
   const [consoleMachine, setConsoleMachine] = useState<string | null>(null)
+  const [kindleScreenOpen, setKindleScreenOpen] = useState(false)
   const [forcePowerOffMachine, setForcePowerOffMachine] = useState<
     string | null
   >(null)
@@ -356,7 +363,7 @@ export function VirtualMachinesPanel() {
             <MonitorPlay className='size-4' aria-hidden='true' />
           </IconBadge>
           <div>
-            <h3 className='text-sm font-semibold'>{t('Windows workspaces')}</h3>
+            <h3 className='text-sm font-semibold'>{t('Remote workspaces')}</h3>
             <p className='text-muted-foreground text-xs'>
               {t(
                 'Starting Win11 saves fnOS automatically; fnOS resumes after Win11 stops.'
@@ -365,6 +372,9 @@ export function VirtualMachinesPanel() {
           </div>
         </div>
         <div className='flex flex-wrap items-center gap-2'>
+          <Button variant='outline' size='sm' onClick={() => setIbmcOpen(true)}>
+            {t('Virtual iBMC')}
+          </Button>
           <Button
             variant='outline'
             size='sm'
@@ -442,13 +452,125 @@ export function VirtualMachinesPanel() {
             {t('No managed virtual machines were found.')}
           </p>
         )}
+        <article className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'>
+          <div className='flex min-w-0 items-center gap-3'>
+            <Terminal
+              className='text-muted-foreground size-4 shrink-0'
+              aria-hidden='true'
+            />
+            <div>
+              <div className='flex flex-wrap items-center gap-2'>
+                <h4 className='font-medium'>Kindle</h4>
+                <Badge variant='secondary'>{t('SSH terminal')}</Badge>
+              </div>
+              <p className='text-muted-foreground mt-0.5 text-xs'>
+                {t('Sign in as kindle with the Kindle SSH password.')}
+              </p>
+            </div>
+          </div>
+          <div className='flex flex-wrap gap-2'>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => setKindleScreenOpen(true)}
+            >
+              <MonitorPlay data-icon='inline-start' />
+              {t('View screen')}
+            </Button>
+            <Button
+              size='sm'
+              render={
+                <a
+                  href='/kindle-terminal/#/client/a2luZGxlAGMAa2luZGxlLXRlcm1pbmFs'
+                  target='_blank'
+                  rel='noreferrer'
+                />
+              }
+              nativeButton={false}
+            >
+              <Terminal data-icon='inline-start' />
+              {t('Open terminal')}
+            </Button>
+          </div>
+        </article>
+        <article className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'>
+          <div className='flex min-w-0 items-center gap-3'>
+            <Terminal
+              className='text-muted-foreground size-4 shrink-0'
+              aria-hidden='true'
+            />
+            <div className='min-w-0'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <h4 className='font-medium'>mafuli</h4>
+                <Badge variant='secondary'>{t('SSH terminal')}</Badge>
+              </div>
+              <p className='text-muted-foreground mt-0.5 text-xs'>
+                {t('Debian system account')}
+              </p>
+            </div>
+          </div>
+          <Button
+            size='sm'
+            render={
+              <a
+                href='/terminal/#/client/bWFmdWxpAGMAZGViaWFuLXRlcm1pbmFs'
+                target='_blank'
+                rel='noreferrer'
+              />
+            }
+            nativeButton={false}
+          >
+            <Terminal data-icon='inline-start' />
+            {t('Open terminal')}
+          </Button>
+        </article>
+        <article className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'>
+          <div className='flex min-w-0 items-center gap-3'>
+            <Terminal
+              className='text-muted-foreground size-4 shrink-0'
+              aria-hidden='true'
+            />
+            <div className='min-w-0'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <h4 className='font-medium'>S5700-LSW1</h4>
+                <Badge variant='secondary'>{t('Telnet console')}</Badge>
+              </div>
+              <p className='text-muted-foreground mt-0.5 text-xs'>
+                {t('Huawei eNSP switch in win7. Start win7 and the device in eNSP first.')}
+              </p>
+            </div>
+          </div>
+          <Button
+            size='sm'
+            render={
+              <a
+                href='/guacamole/#/client/NwBjAHBvc3RncmVzcWw'
+                target='_blank'
+                rel='noreferrer'
+              />
+            }
+            nativeButton={false}
+          >
+            <Terminal data-icon='inline-start' />
+            {t('Open terminal')}
+          </Button>
+        </article>
       </div>
 
+      {ibmcOpen && (
+        <Suspense fallback={<p role='status'>{t('Loading...')}</p>}>
+          <IBMCPanel onClose={() => setIbmcOpen(false)} />
+        </Suspense>
+      )}
       <VirtualMachineConsole
         machineName={consoleMachine}
         onOpenChange={(open) => {
           if (!open) setConsoleMachine(null)
         }}
+      />
+      <KindleScreen
+        open={kindleScreenOpen}
+        onOpenChange={setKindleScreenOpen}
       />
 
       <AlertDialog

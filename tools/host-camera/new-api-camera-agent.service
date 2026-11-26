@@ -1,0 +1,14 @@
+[Unit]
+Description=On-demand host camera agent for DragonAPI
+After=pipewire-pulse.service
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/bin/python3 /home/dragon/Documents/antigravity/eager-hypatia/tools/host-camera/agent.py
+Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

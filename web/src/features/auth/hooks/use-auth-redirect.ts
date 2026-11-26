@@ -24,6 +24,7 @@ import {
   sanitizeAuthRedirect,
 } from '@/features/auth/lib/auth-redirect'
 import { applyAuthBundle } from '@/lib/api'
+import { isDragonLabOnlyUser } from '@/lib/dragon-lab-access'
 import type { AuthBundle } from '@/stores/auth-store'
 
 /**
@@ -47,8 +48,10 @@ export function useAuthRedirect() {
       await i18n.changeLanguage(savedLang)
     }
 
-    const targetPath =
-      sanitizeAuthRedirect(redirectTo, window.location.origin) ?? '/dashboard'
+    const targetPath = isDragonLabOnlyUser(bundle.user)
+      ? '/'
+      : (sanitizeAuthRedirect(redirectTo, window.location.origin) ??
+        '/dashboard')
     navigate({ href: targetPath, replace: true })
   }
 

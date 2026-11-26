@@ -249,3 +249,21 @@ class AgentResponsivenessTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ManagedServiceRecoveryTest(unittest.TestCase):
+    def test_missing_managed_pid_rejects_commands_without_auto_spawning_vboxsvc(self):
+        with (mock.patch.dict(vm_agent.os.environ, {"VM_AGENT_REQUIRE_MANAGED_SERVICE": "1"}),
+              mock.patch.object(Path, "read_text", side_effect=FileNotFoundError),
+              mock.patch.object(vm_agent.subprocess, "run") as run):
+            with self.assertRaisesRegex(RuntimeError, "management service is restarting"):
+                vm_agent.run_vbox("showvminfo", "openEuler")
+        run.assert_not_called()
+
+    def test_stale_pid_cannot_be_mistaken_for_the_managed_service(self):
+        with (mock.patch.dict(vm_agent.os.environ, {"VM_AGENT_REQUIRE_MANAGED_SERVICE": "1"}),
+              mock.patch.object(Path, "read_text", side_effect=["123", "another-process"]),
+              mock.patch.object(vm_agent.subprocess, "run") as run):
+            with self.assertRaisesRegex(RuntimeError, "management service is restarting"):
+                vm_agent.run_vbox("showvminfo", "openEuler")
+        run.assert_not_called()

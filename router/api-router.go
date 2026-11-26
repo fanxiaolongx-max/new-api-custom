@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/service/authz"
 
 	// Import oauth package to register providers via init()
 	_ "github.com/QuantumNous/new-api/oauth"
@@ -12,6 +13,13 @@ import (
 )
 
 func SetApiRouter(router *gin.Engine) {
+	router.GET("/api/system/camera/stream", middleware.RootAuth(), middleware.DisableCache(), controller.StreamHostCamera)
+	// Terminal traffic has its own authenticated budget: keystrokes and output
+	// polling must not exhaust the rest of the dashboard's API allowance.
+	serialRoute := router.Group("/api/system/ibmc/serial")
+	serialRoute.Use(middleware.RouteTag("api"), middleware.AdminAuth(), middleware.RequirePermission(authz.DragonLabFull), middleware.DisableCache(), middleware.BodyStorageCleanup(), middleware.IBMCSerialRateLimit())
+	serialRoute.GET("", controller.ReadIBMCSerial)
+	serialRoute.POST("", controller.WriteIBMCSerial)
 	apiRouter := router.Group("/api")
 	apiRouter.Use(middleware.RouteTag("api"))
 	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))
@@ -27,16 +35,42 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/status/test", middleware.AdminAuth(), controller.TestStatus)
 		apiRouter.GET("/system/temperature", middleware.AdminAuth(), controller.GetSystemTemperature)
 		apiRouter.GET("/system/host-metrics", middleware.AdminAuth(), controller.GetSystemHostMetrics)
-		virtualMachineRoute := apiRouter.Group("/system/virtual-machines")
-		virtualMachineRoute.Use(middleware.RootAuth(), middleware.DisableCache())
+		apiRouter.GET("/system/kindle/screen", middleware.RootAuth(), middleware.DisableCache(), controller.GetKindleScreen)
+		ontRoute := apiRouter.Group("/system/ont")
+		ontRoute.Use(middleware.RootAuth(), middleware.DisableCache())
 		{
-			virtualMachineRoute.GET("", controller.ListVirtualMachines)
-			virtualMachineRoute.GET("/settings", controller.GetVirtualMachineSettings)
-			virtualMachineRoute.PUT("/settings", controller.UpdateVirtualMachineSettings)
-			virtualMachineRoute.POST("/:name/action", controller.ControlVirtualMachine)
-			virtualMachineRoute.GET("/:name/screenshot", controller.GetVirtualMachineScreenshot)
-			virtualMachineRoute.POST("/:name/keyboard", controller.SendVirtualMachineKeyboard)
-			virtualMachineRoute.POST("/:name/mouse", controller.SendVirtualMachineMouse)
+			ontRoute.GET("", controller.GetONTMonitor)
+			ontRoute.GET("/history", controller.GetONTMonitorHistory)
+			ontRoute.PUT("/settings", middleware.CriticalRateLimit(), controller.UpdateONTMonitor)
+			ontRoute.POST("/refresh", middleware.CriticalRateLimit(), controller.RefreshONTMonitor)
+		}
+		apiRouter.GET("/system/lab/console/auth", middleware.DisableCache(), controller.DragonLabConsoleAuth)
+		apiRouter.GET("/system/lab/console/sso", middleware.DisableCache(), controller.DragonLabConsoleSSO)
+		labRoute := apiRouter.Group("/system/lab")
+		labRoute.Use(middleware.AdminAuth(), middleware.RequirePermission(authz.DragonLabFull), middleware.DisableCache())
+		{
+			labRoute.GET("", controller.GetDragonLab)
+			labRoute.PUT("", middleware.UserCriticalRateLimit("dragon-lab"), controller.UpdateDragonLab)
+			labRoute.GET("/tool", controller.GetDragonLabTool)
+			labRoute.POST("/factory-reset", middleware.UserCriticalRateLimit("dragon-lab-reset"), controller.ResetDragonLab)
+		}
+		ibmcRoute := apiRouter.Group("/system/ibmc")
+		ibmcRoute.Use(middleware.DisableCache())
+		{
+			ibmcRoute.GET("", middleware.AdminAuth(), middleware.RequirePermission(authz.DragonLabFull), controller.GetIBMC)
+			ibmcRoute.POST("/action", middleware.RootAuth(), middleware.CriticalRateLimit(), controller.ControlIBMC)
+		}
+		virtualMachineRoute := apiRouter.Group("/system/virtual-machines")
+		virtualMachineRoute.Use(middleware.DisableCache())
+		virtualMachineRoute.GET("", middleware.AdminAuth(), middleware.RequirePermission(authz.DragonLabFull), controller.ListVirtualMachines)
+		virtualMachineRootRoute := virtualMachineRoute.Group("", middleware.RootAuth())
+		{
+			virtualMachineRootRoute.GET("/settings", controller.GetVirtualMachineSettings)
+			virtualMachineRootRoute.PUT("/settings", controller.UpdateVirtualMachineSettings)
+			virtualMachineRootRoute.POST("/:name/action", controller.ControlVirtualMachine)
+			virtualMachineRootRoute.GET("/:name/screenshot", controller.GetVirtualMachineScreenshot)
+			virtualMachineRootRoute.POST("/:name/keyboard", controller.SendVirtualMachineKeyboard)
+			virtualMachineRootRoute.POST("/:name/mouse", controller.SendVirtualMachineMouse)
 		}
 		apiRouter.GET("/notice", controller.GetNotice)
 		apiRouter.GET("/user-agreement", controller.GetUserAgreement)

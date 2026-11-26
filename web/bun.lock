@@ -23,6 +23,7 @@
         "@tanstack/react-virtual": "^3.14.5",
         "@visactor/react-vchart": "^2.1.2",
         "@visactor/vchart": "^2.1.2",
+        "@xterm/xterm": "^6.0.0",
         "ai": "^7.0.14",
         "auto-skeleton-react": "^1.0.5",
         "axios": "^1.18.1",
@@ -1076,6 +1077,8 @@
     "@vitest/utils": ["@vitest/utils@4.1.10", "", { "dependencies": { "@vitest/pretty-format": "4.1.10", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA=="],
 
     "@workflow/serde": ["@workflow/serde@4.1.0", "", {}, "sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ=="],
+
+    "@xterm/xterm": ["@xterm/xterm@6.0.0", "", {}, "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg=="],
 
     "@xyflow/react": ["@xyflow/react@12.11.2", "", { "dependencies": { "@xyflow/system": "0.0.79", "classcat": "^5.0.3", "zustand": "^4.4.0" }, "peerDependencies": { "@types/react": ">=17", "@types/react-dom": ">=17", "react": ">=17", "react-dom": ">=17" }, "optionalPeers": ["@types/react", "@types/react-dom"] }, "sha512-eLAlDWJfWnQEhJwGMjlWdAXO9eYllKpliUmPQlAmOLxz6mExXuzMVDUKLMquixgkrtmMFFtug3jGKmYYld12cA=="],
 

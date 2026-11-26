@@ -45,6 +45,9 @@ vi.mock('@/features/dashboard/api', () => ({
   sendVirtualMachineMouse: vi.fn(),
 }))
 
+const kindleScreenGet = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api', () => ({ api: { get: kindleScreenGet } }))
+
 function renderPanel() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -61,6 +64,80 @@ function renderPanel() {
 }
 
 describe('virtual machine management', () => {
+  test('offers Kindle screen and its separate SSH terminal', async () => {
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('Kindle')).closest('article')
+    if (!row) throw new Error('Kindle row not found')
+    expect(
+      within(row).getByRole('button', { name: 'View screen' })
+    ).toBeInTheDocument()
+    expect(
+      within(row).getByRole('button', { name: 'Open terminal' })
+    ).toHaveAttribute(
+      'href',
+      '/kindle-terminal/#/client/a2luZGxlAGMAa2luZGxlLXRlcm1pbmFs'
+    )
+    queryClient.clear()
+  })
+
+  test('shows an error when the opened Kindle screen is unavailable', async () => {
+    kindleScreenGet.mockRejectedValueOnce(new Error('offline'))
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('Kindle')).closest('article')
+    if (!row) throw new Error('Kindle row not found')
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'View screen' })
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load the Kindle screen'
+    )
+    expect(kindleScreenGet).toHaveBeenCalledWith(
+      '/api/system/kindle/screen',
+      expect.any(Object)
+    )
+    queryClient.clear()
+  })
+  test('offers mafuli a separate system terminal without virtual machine power controls', async () => {
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('mafuli')).closest('article')
+    if (!row) throw new Error('mafuli row not found')
+
+    expect(within(row).getByText('SSH terminal')).toBeInTheDocument()
+    const terminal = within(row).getByRole('button', { name: 'Open terminal' })
+    expect(terminal).toHaveAttribute(
+      'href',
+      '/terminal/#/client/bWFmdWxpAGMAZGViaWFuLXRlcm1pbmFs'
+    )
+    expect(terminal).toHaveAttribute('target', '_blank')
+    expect(
+      within(row).queryByRole('button', { name: 'Shut down' })
+    ).not.toBeInTheDocument()
+    expect(within(row).queryByText('Running')).not.toBeInTheDocument()
+    queryClient.clear()
+  })
+
+  test('opens the openEuler SSH workspace when the VM is running', async () => {
+    getVirtualMachines.mockResolvedValueOnce({
+      success: true,
+      data: [
+        {
+          name: 'openEuler',
+          state: 'running',
+          os_type: 'Oracle Linux (64-bit)',
+          memory_mb: 2048,
+          cpu_count: 2,
+        },
+      ],
+    })
+    const queryClient = renderPanel()
+    const row = (await screen.findByText('openEuler')).closest('article')
+    if (!row) throw new Error('openEuler row not found')
+    expect(
+      within(row).getByRole('button', { name: 'Remote control' })
+    ).toHaveAttribute('href', '/guacamole/#/client/NgBjAHBvc3RncmVzcWw')
+    queryClient.clear()
+  })
+
   beforeEach(() => {
     getVirtualMachines.mockResolvedValue({
       success: true,
