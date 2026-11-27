@@ -76,7 +76,7 @@ def factory_status(slots):
     # name, ssh port, SW1 iBMC port, expected link type, expected PVID
     nodes = [('Node-01', 13393, 'GE0/0/2', 'hybrid', '1')]
     for s in slots:
-        vlan = next((l.get('vlan') for l in s.get('links', []) if l.get('id') == 'sw1-ibmc'), '')
+        vlan = s.get('parking_vlan') or next((l.get('vlan') for l in s.get('links', []) if l.get('id') == 'sw1-ibmc'), '')
         nodes.append((s['name'], s['ssh'], s['mgmt'], 'access', str(vlan)))
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         switch = pool.submit(probe, 13393, FACTORY_SWITCH_PROBE)

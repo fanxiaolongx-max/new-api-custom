@@ -175,6 +175,7 @@ export function useWorkbenchBridge(props: {
               const oldStream = previous?.executionTerminals?.find(
                 (item) =>
                   item.nodeId === stream.nodeId &&
+                  item.host === stream.host &&
                   item.sessionId === stream.sessionId &&
                   item.runId === stream.runId
               )

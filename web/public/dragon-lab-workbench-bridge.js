@@ -202,8 +202,9 @@
       try {
         const snapshot = api.getTerminalSnapshot()
         if (Array.isArray(snapshot?.streams)) {
+          // One stream per card, plus one per server on the iBMC / OS cards.
           streams = snapshot.streams
-            .slice(0, 5)
+            .slice(0, 24)
             .filter(
               (stream) =>
                 stream?.redacted === true &&
@@ -213,6 +214,10 @@
             )
             .map((stream) => ({
               nodeId: stream.nodeId,
+              host:
+                typeof stream.host === 'string' && stream.host.length < 80
+                  ? stream.host
+                  : null,
               sessionId: stream.sessionId,
               runId: stream.runId,
               seq: stream.seq,

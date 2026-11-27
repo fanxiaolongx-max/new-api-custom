@@ -27,7 +27,7 @@ export const LAB_NODES: {
   {
     id: 'ibmc',
     title: 'iBMC · management plane',
-    subtitle: 'SSH simulator → SOL → OS',
+    subtitle: '{{name}} · SSH simulator → SOL → OS',
     kind: 'simulated',
     column: 3,
     row: 1,
@@ -43,7 +43,7 @@ export const LAB_NODES: {
   {
     id: 'os',
     title: 'TaiShan OS · openEuler',
-    subtitle: 'Node-01 · Bond4 · 2 × 10G target',
+    subtitle: '{{name}} · Bond4 · 2 × 10G target',
     kind: 'physical',
     column: 3,
     row: 2,

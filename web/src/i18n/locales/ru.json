@@ -3485,7 +3485,7 @@
     "Node filters": "Фильтры узлов",
     "Node Name": "Имя узла",
     "Node role": "Роль узла",
-    "Node-01 · Bond4 · 2 × 10G target": "Node-01 · Bond4 · цель 2 × 10G",
+    "{{name}} · Bond4 · 2 × 10G target": "{{name}} · Bond4 · цель 2 × 10G",
     "Nodes reporting from this deployment and their latest heartbeat.": "Узлы этого развертывания и их последнее сердцебиение.",
     "Noise level": "Уровень шума",
     "Non-stream": "Не потоковый",
@@ -4977,7 +4977,7 @@
     "Spend limited": "Ограничение расходов",
     "Spread HTTP/2 traffic across multiple reusable connections to the same upstream origin (1-8).": "Распределяет трафик HTTP/2 по нескольким переиспользуемым соединениям к одному upstream-источнику (1-8).",
     "SQLite stores all data in a single file. Make sure that file is persisted when running in containers.": "SQLite хранит все данные в одном файле. Убедитесь, что файл сохраняется при работе в контейнерах.",
-    "SSH simulator → SOL → OS": "Симулятор SSH → SOL → ОС",
+    "{{name}} · SSH simulator → SOL → OS": "{{name}} · Симулятор SSH → SOL → ОС",
     "SSH terminal": "SSH-терминал",
     "SSID": "Имя сети (SSID)",
     "SSID 1/5": "SSID 1/5",
@@ -6125,6 +6125,7 @@
     "Port down": "Порт выключен",
     "Port degraded": "Порт работает с ограничениями",
     "Port status unknown": "Состояние порта неизвестно",
-    "Port status is out of date": "Состояние порта устарело"
+    "Port status is out of date": "Состояние порта устарело",
+    "Sampled {{seconds}}s ago": "Обновлено {{seconds}} с назад"
   }
 }

@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically clean stale new-api build history and staging artifacts
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=6h
+AccuracySec=5min
+Persistent=true
+Unit=new-api-build-cleanup.service
+
+[Install]
+WantedBy=timers.target

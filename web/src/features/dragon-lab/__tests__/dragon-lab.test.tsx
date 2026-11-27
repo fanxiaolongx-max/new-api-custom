@@ -32,7 +32,9 @@ vi.mock('@/features/dashboard/components/overview/ibmc-serial', () => ({
 vi.mock('@/components/layout', () => ({
   PublicLayout: (props: { children: React.ReactNode }) => props.children,
 }))
-vi.mock('@/components/layout/components/footer', () => ({ Footer: () => null }))
+vi.mock('@/components/layout/components/footer', () => ({
+  Footer: () => null,
+}))
 vi.mock('@tanstack/react-router', () => ({
   Link: (props: AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) => (
     <a {...props} href={props.to} />
@@ -293,9 +295,14 @@ describe('Dragon Lab topology', () => {
       screen.getByRole('button', { name: 'Link details: LACP member A' })
     )
     const detail = screen.getByRole('region', { name: 'Selected link' })
-    expect(detail).toHaveTextContent(
-      'GE0/0/2 [192.168.56.10] → enp0s9 [60.11.42.99/19]'
-    )
+    expect(detail).toHaveTextContent('GE0/0/2')
+    expect(detail).toHaveTextContent('192.168.56.10')
+    expect(detail).toHaveTextContent('enp0s9')
+    expect(detail).toHaveTextContent('60.11.42.99/19')
+    await userEvent.keyboard('{Escape}')
+    expect(
+      screen.queryByRole('region', { name: 'Selected link' })
+    ).not.toBeInTheDocument()
     client.clear()
   })
   test('script tool uses a sandbox without access to the parent application origin', async () => {

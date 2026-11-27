@@ -23,7 +23,8 @@ except (OSError, ValueError):
     slots = []
 for s in slots if isinstance(slots, list) else []:
     try:
-        vlan = next(l["vlan"] for l in s["links"] if l["id"] == "sw1-ibmc")
+        # parking_vlan: factory VLAN of the iBMC port; the sw1-ibmc link VLAN is the deployment target.
+        vlan = s.get("parking_vlan") or next(l["vlan"] for l in s["links"] if l["id"] == "sw1-ibmc")
         row = (s["name"], int(s["ssh"]), s["mgmt"], int(vlan))
     except (KeyError, TypeError, ValueError, StopIteration):
         continue

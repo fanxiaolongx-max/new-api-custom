@@ -251,6 +251,7 @@ test('cs bridge invokes the task API once, streams snapshots, rejects invalid ac
   expect(parent.postMessage.mock.calls[0][0].executionTerminals).toEqual([
     {
       nodeId: 'os',
+      host: null,
       sessionId: 'pty-1',
       runId: 'run-1',
       seq: 1,

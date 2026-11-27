@@ -196,7 +196,9 @@ export function LabNode(props: {
         </span>
         <div className='lab-node-title'>
           <h2>{t(node.title)}</h2>
-          <span>{props.instanceName ?? t(node.subtitle)}</span>
+          <span>
+            {t(node.subtitle, { name: props.instanceName ?? 'Node-01' })}
+          </span>
         </div>
         {props.osPicker}
         <span

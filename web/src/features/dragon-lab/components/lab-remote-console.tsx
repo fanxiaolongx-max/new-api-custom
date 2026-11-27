@@ -1,11 +1,8 @@
-import { Keyboard } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 
 // Give Guacamole a desktop-sized viewport, then scale the live frame to its card.
 // CSS transforms preserve native iframe pointer coordinates and keyboard input.
 export function LabRemoteConsole(props: { src: string; title: string }) {
-  const { t } = useTranslation()
   const frame = useRef<HTMLIFrameElement>(null)
   const viewport = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 400, height: 210 })
@@ -50,15 +47,6 @@ export function LabRemoteConsole(props: { src: string; title: string }) {
         allowFullScreen
         referrerPolicy='same-origin'
       />
-      <button
-        className='lab-focus-console'
-        type='button'
-        aria-label={t('Focus terminal')}
-        title={t('Focus terminal')}
-        onClick={() => frame.current?.contentWindow?.focus()}
-      >
-        <Keyboard size={13} />
-      </button>
     </div>
   )
 }

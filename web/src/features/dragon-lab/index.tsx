@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Settings2,
 } from 'lucide-react'
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -49,9 +49,10 @@ import { LabPortMap } from './components/lab-port-map'
 import { LabReadiness } from './components/lab-readiness'
 import LabTool from './components/lab-tool'
 import { LabWiring } from './components/lab-wiring'
-import { LAB_LINKS, LAB_NODES } from './topology'
+import { LAB_NODES } from './topology'
 import { useWorkbenchBridge } from './use-workbench-bridge'
 import { workbenchTaskActive } from './workbench-task'
+import { cardTerminal } from './workbench-terminals'
 
 import './lab.css'
 
@@ -59,6 +60,8 @@ const LabSettings = lazy(() => import('./components/lab-settings'))
 // Node-01 is the original openEuler guest described by the saved topology.
 const BASE_NODE = 'Node-01'
 const OS_NODE_KEY = 'dragon-lab-os-node'
+// Parallel stage-2 workers alternate targets; an automatic switch holds this long.
+const FOLLOW_HOLD_MS = 8000
 export function DragonLab() {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
@@ -77,6 +80,7 @@ export function DragonLab() {
   const workbenchFrame = useRef<HTMLIFrameElement>(null)
   const toolOpener = useRef<HTMLElement | null>(null)
   const [selected, setSelected] = useState<LabLinkID | null>(null)
+  const [tab, setTab] = useState('topology')
   const config = useQuery({
     queryKey: LAB_KEY,
     queryFn: getLabConfig,
@@ -161,6 +165,29 @@ export function DragonLab() {
       // Remembering the last node is a convenience only.
     }
   }
+  // While a workbench task runs, the iBMC / OS cards show the node it is
+  // working on. A manual switch is kept until the task moves to another node.
+  const taskTarget = workbench.state?.task?.currentTarget?.trim().toLowerCase()
+  const followTarget = workbenchTaskActive(workbench.state?.task)
+    ? nodeNames.find((name) => name.toLowerCase() === taskTarget)
+    : undefined
+  const followDirection =
+    followTarget && nodeNames.indexOf(followTarget) < nodeNames.indexOf(osName)
+      ? 'prev'
+      : 'next'
+  const followed = useRef<{ name?: string; at: number }>({ at: 0 })
+  useEffect(() => {
+    if (!followTarget || followTarget === followed.current.name) return
+    const timer = setTimeout(
+      () => {
+        followed.current = { name: followTarget, at: Date.now() }
+        setSlide(followDirection)
+        setOSName(followTarget)
+      },
+      Math.max(0, followed.current.at + FOLLOW_HOLD_MS - Date.now())
+    )
+    return () => clearTimeout(timer)
+  }, [followTarget, followDirection])
   const workbenchHosts = workbench.state?.hosts
   // Guests already in the workbench (matched by host name) need no import prompt.
   const unimported = workbenchHosts
@@ -245,7 +272,6 @@ export function DragonLab() {
     config.data?.nodes.filter(
       (node) => node.console_mode === 'remote' && node.console_id > 0
     ).length ?? 0
-  const link = topology?.links.find((item) => item.id === selected)
   const refresh = () => {
     void config.refetch()
     void machines.refetch()
@@ -409,7 +435,7 @@ export function DragonLab() {
               </span>
             </div>
           </section>
-          <Tabs defaultValue='topology' className='lab-body-tabs'>
+          <Tabs value={tab} onValueChange={setTab} className='lab-body-tabs'>
             <div className='lab-tabs-bar'>
               <TabsList variant='line'>
                 <TabsTrigger value='topology'>{t('Live topology')}</TabsTrigger>
@@ -437,46 +463,6 @@ export function DragonLab() {
                 </Button>
               </div>
             </div>
-            {link && (
-              <section
-                className='lab-selection'
-                aria-label={t('Selected link')}
-              >
-                <div>
-                  <strong>
-                    {t(
-                      LAB_LINKS.find((item) => item.id === link.id)?.title ??
-                        link.id
-                    )}{' '}
-                    ·{' '}
-                    {link.phase === 'configured'
-                      ? t('Configured')
-                      : t('Planned')}
-                  </strong>
-                  <p>
-                    {link.source_port} [{link.source_address || '—'}] →{' '}
-                    {link.target_port} [{link.target_address || '—'}]
-                    {link.vlan ? ` · VLAN ${link.vlan}` : ''}
-                  </p>
-                </div>
-                <div className='flex gap-2'>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    onClick={() => setSettings(true)}
-                  >
-                    {t('Edit labels')}
-                  </Button>
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    onClick={() => setSelected(null)}
-                  >
-                    {t('Close')}
-                  </Button>
-                </div>
-              </section>
-            )}
             <TabsContent value='topology'>
               <div className='lab-topology-shell'>
                 <div className='lab-canvas'>
@@ -485,9 +471,11 @@ export function DragonLab() {
                     instanceStatus={instance?.status}
                     status={authorized ? linkStatus.data : undefined}
                     authorized={authorized}
+                    selected={selected}
                     onSelect={(id) => {
                       if (authorized) setSelected(id)
                     }}
+                    onEdit={() => setSettings(true)}
                   />
                   {LAB_NODES.map((node) => {
                     const vmName = node.id === 'pc' ? 'win7' : 'openEuler'
@@ -503,7 +491,7 @@ export function DragonLab() {
                             : node.id
                         }
                         definition={node}
-                        instanceName={guest ? instance?.name : undefined}
+                        instanceName={guest ? osName : undefined}
                         instanceState={guest ? instance?.state : undefined}
                         osPicker={
                           node.id === 'os' &&
@@ -529,15 +517,21 @@ export function DragonLab() {
                           authorized && config.data?.workbench_url
                             ? {
                                 target: guest
-                                  ? workbench.state?.task?.currentTarget
+                                  ? (cardTerminal(
+                                      workbench.state?.executionTerminals,
+                                      node.id,
+                                      osName
+                                    )?.host ??
+                                    workbench.state?.task?.currentTarget)
                                   : undefined,
                                 active: workbenchTaskActive(
                                   workbench.state?.task
                                 ),
-                                terminal:
-                                  workbench.state?.executionTerminals?.find(
-                                    (stream) => stream.nodeId === node.id
-                                  ),
+                                terminal: cardTerminal(
+                                  workbench.state?.executionTerminals,
+                                  node.id,
+                                  guest ? osName : undefined
+                                ),
                                 connected: workbench.connected,
                                 available:
                                   workbench.state?.terminalAPI === true,
@@ -593,7 +587,10 @@ export function DragonLab() {
               {authorized && config.data && (
                 <LabPortMap
                   config={topology ?? config.data}
-                  onSelect={setSelected}
+                  onSelect={(id) => {
+                    setSelected(id)
+                    setTab('topology')
+                  }}
                 />
               )}
             </TabsContent>

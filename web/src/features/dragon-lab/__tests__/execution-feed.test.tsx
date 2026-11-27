@@ -4,10 +4,11 @@ import { expect, test, vi } from 'vitest'
 
 import { LabNode } from '../components/lab-node'
 import { LAB_NODES } from '../topology'
-import { readExecutionTerminals } from '../workbench-terminals'
+import { cardTerminal, readExecutionTerminals } from '../workbench-terminals'
 
 const terminal = {
   nodeId: 'os' as const,
+  host: null,
   sessionId: 'pty-1',
   runId: 'run-1',
   seq: 1,
@@ -28,6 +29,29 @@ test('only bounded, redacted streams from known nodes enter the execution view',
   expect(
     readExecutionTerminals([{ ...terminal, text: '\x1b[32mOK\x1b[0m' }])[0].text
   ).toBe('OK')
+})
+
+test('parallel servers keep separate iBMC / OS streams and each card shows its own server', () => {
+  const streams = readExecutionTerminals([
+    { ...terminal, host: 'Node-01', text: 'login: root' },
+    { ...terminal, host: 'Node-02', sessionId: 'pty-2', text: 'login: admin' },
+    { ...terminal, host: 'Node-02', sessionId: 'pty-3' },
+    { ...terminal, host: 'x'.repeat(80), sessionId: 'pty-5' },
+    { ...terminal, nodeId: 'pc', sessionId: 'pty-4' },
+  ])
+  expect(streams.map((stream) => stream.sessionId)).toEqual([
+    'pty-1',
+    'pty-2',
+    'pty-4',
+  ])
+  expect(cardTerminal(streams, 'os', 'node-02')?.text).toBe('login: admin')
+  expect(cardTerminal(streams, 'os', 'Node-01')?.text).toBe('login: root')
+  expect(cardTerminal(streams, 'os', 'Node-03')).toBeUndefined()
+  expect(cardTerminal(streams, 'pc')?.sessionId).toBe('pty-4')
+  // An older workbench sends one card-wide stream per card.
+  expect(
+    cardTerminal(readExecutionTerminals([terminal]), 'os', 'Node-02')?.sessionId
+  ).toBe('pty-1')
 })
 
 test('a node defaults to read-only execution and keeps the interactive session when switching and expanding', async () => {

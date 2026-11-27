@@ -2,6 +2,8 @@ import type { LabNodeID } from './api'
 
 export interface ExecutionTerminal {
   nodeId: LabNodeID
+  // The server an iBMC / OS stream belongs to; null for a card-wide stream.
+  host: string | null
   sessionId: string
   runId: string
   seq: number
@@ -12,15 +14,18 @@ export interface ExecutionTerminal {
 // A bounded, redacted text snapshot, never HTML or a terminal input channel.
 export function readExecutionTerminals(value: unknown): ExecutionTerminal[] {
   if (!Array.isArray(value)) return []
-  const nodes = new Set<string>()
+  const seen = new Set<string>()
   const streams: ExecutionTerminal[] = []
-  for (const item of value.slice(0, 5)) {
+  for (const item of value.slice(0, 24)) {
     if (!item || typeof item !== 'object') continue
     const stream = item as Record<string, unknown>
     if (
       typeof stream.nodeId !== 'string' ||
       !['pc', 'sw1', 'sw2', 'ibmc', 'os'].includes(stream.nodeId) ||
-      nodes.has(stream.nodeId) ||
+      (stream.host !== null &&
+        stream.host !== undefined &&
+        (typeof stream.host !== 'string' || stream.host.length >= 80)) ||
+      seen.has(`${stream.nodeId}@${stream.host ?? ''}`) ||
       stream.redacted !== true ||
       typeof stream.sessionId !== 'string' ||
       stream.sessionId.length > 160 ||
@@ -34,9 +39,10 @@ export function readExecutionTerminals(value: unknown): ExecutionTerminal[] {
     ) {
       continue
     }
-    nodes.add(stream.nodeId)
+    seen.add(`${stream.nodeId}@${stream.host ?? ''}`)
     streams.push({
       nodeId: stream.nodeId as LabNodeID,
+      host: typeof stream.host === 'string' ? stream.host : null,
       sessionId: stream.sessionId,
       runId: stream.runId,
       seq: Number(stream.seq),
@@ -49,4 +55,23 @@ export function readExecutionTerminals(value: unknown): ExecutionTerminal[] {
     })
   }
   return streams
+}
+
+// The stream a topology card shows: on the iBMC / OS cards the selected
+// server's own stream, else the card-wide one an older workbench sends.
+export function cardTerminal(
+  streams: ExecutionTerminal[] | undefined,
+  nodeId: LabNodeID,
+  host?: string
+): ExecutionTerminal | undefined {
+  const name = host?.toLowerCase()
+  return (
+    (name
+      ? streams?.find(
+          (stream) =>
+            stream.nodeId === nodeId && stream.host?.toLowerCase() === name
+        )
+      : undefined) ??
+    streams?.find((stream) => stream.nodeId === nodeId && stream.host === null)
+  )
 }

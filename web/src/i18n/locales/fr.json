@@ -3485,7 +3485,7 @@
     "Node filters": "Filtres de nœuds",
     "Node Name": "Nom du nœud",
     "Node role": "Rôle du nœud",
-    "Node-01 · Bond4 · 2 × 10G target": "Node-01 · Bond4 · cible 2 × 10G",
+    "{{name}} · Bond4 · 2 × 10G target": "{{name}} · Bond4 · cible 2 × 10G",
     "Nodes reporting from this deployment and their latest heartbeat.": "Nœuds signalés par ce déploiement et leur dernier battement de cœur.",
     "Noise level": "Niveau de bruit",
     "Non-stream": "Non-streaming",
@@ -4977,7 +4977,7 @@
     "Spend limited": "Dépenses limitées",
     "Spread HTTP/2 traffic across multiple reusable connections to the same upstream origin (1-8).": "Répartit le trafic HTTP/2 sur plusieurs connexions réutilisables vers la même origine amont (1-8).",
     "SQLite stores all data in a single file. Make sure that file is persisted when running in containers.": "SQLite stocke toutes les données dans un seul fichier. Assurez-vous que ce fichier est persisté lors de l'exécution dans des conteneurs.",
-    "SSH simulator → SOL → OS": "Simulateur SSH → SOL → OS",
+    "{{name}} · SSH simulator → SOL → OS": "{{name}} · Simulateur SSH → SOL → OS",
     "SSH terminal": "Terminal SSH",
     "SSID": "Nom du réseau (SSID)",
     "SSID 1/5": "SSID 1/5",
@@ -6125,6 +6125,7 @@
     "Port down": "Port inactif",
     "Port degraded": "Port dégradé",
     "Port status unknown": "État du port inconnu",
-    "Port status is out of date": "L'état du port n'est plus à jour"
+    "Port status is out of date": "L'état du port n'est plus à jour",
+    "Sampled {{seconds}}s ago": "Relevé il y a {{seconds}} s"
   }
 }

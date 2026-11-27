@@ -3485,7 +3485,7 @@
     "Node filters": "ノードフィルター",
     "Node Name": "ノード名",
     "Node role": "ノードの役割",
-    "Node-01 · Bond4 · 2 × 10G target": "Node-01 · Bond4 · 2 × 10G 目標",
+    "{{name}} · Bond4 · 2 × 10G target": "{{name}} · Bond4 · 2 × 10G 目標",
     "Nodes reporting from this deployment and their latest heartbeat.": "このデプロイから報告されたノードと最新のハートビート。",
     "Noise level": "ノイズレベル",
     "Non-stream": "非ストリーミング",
@@ -4977,7 +4977,7 @@
     "Spend limited": "支出制限中",
     "Spread HTTP/2 traffic across multiple reusable connections to the same upstream origin (1-8).": "同一上流オリジンへの再利用可能な複数接続に HTTP/2 トラフィックを分散します（1-8）。",
     "SQLite stores all data in a single file. Make sure that file is persisted when running in containers.": "SQLite はすべてのデータを単一ファイルに保存します。コンテナで実行する場合は、ファイルが永続化されていることを確認してください。",
-    "SSH simulator → SOL → OS": "SSH シミュレーター → SOL → OS",
+    "{{name}} · SSH simulator → SOL → OS": "{{name}} · SSH シミュレーター → SOL → OS",
     "SSH terminal": "SSH ターミナル",
     "SSID": "ネットワーク名 (SSID)",
     "SSID 1/5": "SSID 1/5",
@@ -6125,6 +6125,7 @@
     "Port down": "ポート down",
     "Port degraded": "ポート異常（集約未参加）",
     "Port status unknown": "ポート状態不明",
-    "Port status is out of date": "ポート状態が古くなっています"
+    "Port status is out of date": "ポート状態が古くなっています",
+    "Sampled {{seconds}}s ago": "{{seconds}} 秒前に取得"
   }
 }

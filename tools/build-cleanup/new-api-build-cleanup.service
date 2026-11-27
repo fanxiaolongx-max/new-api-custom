@@ -1,0 +1,17 @@
+[Unit]
+Description=Clean stale new-api Docker build history and temporary staging artifacts
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+Environment=BUILD_CLEANUP_IMAGE_REPOS=new-api-custom
+Environment=BUILD_CLEANUP_KEEP_IMAGES=3
+Environment=BUILD_CLEANUP_MIN_IMAGE_AGE_HOURS=2
+Environment=BUILD_CLEANUP_BUILDER_MAX_AGE_HOURS=72
+Environment=BUILD_CLEANUP_BUILDER_RESERVED_SPACE=2GB
+Environment=BUILD_CLEANUP_TMP_MAX_AGE_HOURS=6
+Environment=BUILD_CLEANUP_DISK_WARN_PCT=85
+ExecStart=/usr/bin/python3 -I /home/dragon/Documents/antigravity/eager-hypatia/tools/build-cleanup/cleanup.py
+StandardOutput=journal
+StandardError=journal
