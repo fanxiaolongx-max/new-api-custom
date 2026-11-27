@@ -5,7 +5,7 @@ import type { LabLinkStatus } from '../api'
 import { LabWiring } from '../components/lab-wiring'
 
 const status: LabLinkStatus = {
-  updated: 1790000000,
+  updated: Date.now() / 1000,
   stale: false,
   endpoints: {
     'sw2:GE0/0/1': {
@@ -48,4 +48,26 @@ test('stale data is shown as unknown instead of the last state', () => {
 test('port state stays hidden from users without lab access', () => {
   render(<LabWiring authorized={false} status={status} onSelect={() => {}} />)
   expect(screen.queryByRole('img')).toBeNull()
+})
+
+test('selecting another OS uses its own switch ports and endpoint samples', () => {
+  const other: LabLinkStatus = {
+    ...status,
+    endpoints: {},
+    links: { 'sw2-os-a': ['sw2:GE0/0/4', 'os:enp0s9'] },
+  }
+  render(
+    <LabWiring
+      authorized
+      status={status}
+      instanceStatus={other}
+      onSelect={() => {}}
+    />
+  )
+  expect(
+    screen.getByRole('img', { name: 'sw2:GE0/0/4: Port status unknown' })
+  ).toHaveClass('is-unknown')
+  expect(
+    screen.queryByRole('img', { name: 'SW2 GE0/0/1: Port down' })
+  ).toBeNull()
 })

@@ -34,6 +34,9 @@ export function LabNode(props: {
     available: boolean
     active?: boolean
   }
+  instanceName?: string
+  instanceState?: string
+  osPicker?: React.ReactNode
   definition: NodeDefinition
   config?: LabNodeConfig
   machine?: VirtualMachine
@@ -69,7 +72,10 @@ export function LabNode(props: {
     ibmc: Terminal,
     os: Server,
   }[node.id]
-  const vmStopped = Boolean(props.machine && props.machine.state !== 'running')
+  const vmState = props.instanceState ?? props.machine?.state
+  const vmStopped = Boolean(
+    vmState && !['running', 'unknown'].includes(vmState)
+  )
   const bound = Boolean(
     config &&
     ((config.console_mode === 'remote' && url) ||
@@ -78,8 +84,8 @@ export function LabNode(props: {
   let state = t('Awaiting setup')
   if (!props.authorized) state = t('Private')
   else if (props.paused) state = t('Paused')
-  else if (props.machine) {
-    state = t(STATE_KEYS[props.machine.state] ?? 'Unknown')
+  else if (vmState) {
+    state = t(STATE_KEYS[vmState] ?? 'Unknown')
   } else if (bound) state = t('Console bound')
   let preview: React.ReactNode = (
     <div className='lab-placeholder'>
@@ -176,10 +182,11 @@ export function LabNode(props: {
         </span>
         <div className='lab-node-title'>
           <h2>{t(node.title)}</h2>
-          <span>{t(node.subtitle)}</span>
+          <span>{props.instanceName ?? t(node.subtitle)}</span>
         </div>
+        {props.osPicker}
         <span
-          className={`lab-runtime ${props.machine?.state === 'running' && !props.paused ? 'is-running' : ''}`}
+          className={`lab-runtime ${vmState === 'running' && !props.paused ? 'is-running' : ''}`}
         >
           {state}
         </span>

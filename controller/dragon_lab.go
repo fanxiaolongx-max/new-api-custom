@@ -126,3 +126,12 @@ func dragonLabConsoleTarget(target string) string {
 	}
 	return target
 }
+
+func GetDragonLabOSNodes(c *gin.Context) {
+	nodes, err := service.GetDragonLabOSNodes()
+	if err != nil {
+		c.JSON(503, gin.H{"success": false, "message": "OS inventory unavailable"})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "data": nodes})
+}

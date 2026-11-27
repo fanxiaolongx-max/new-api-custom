@@ -82,3 +82,19 @@ export function labConsoleURL(id: number): string {
   if (!Number.isInteger(id) || id < 1 || id > 999999) return ''
   return `/guacamole/#/client/${btoa(`${id}\0c\0postgresql`).replace(/=+$/, '')}`
 }
+
+export interface LabOSInstance {
+  name: string
+  state: string
+  nodes: LabNodeConfig[]
+  links: LabLinkConfig[]
+  status: LabLinkStatus
+}
+
+export async function getLabOSNodes(): Promise<LabOSInstance[]> {
+  const response = await api.get<{ data: LabOSInstance[] }>(
+    '/api/system/lab/os-nodes',
+    { skipErrorHandler: true }
+  )
+  return response.data.data
+}

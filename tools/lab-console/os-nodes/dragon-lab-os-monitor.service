@@ -1,0 +1,10 @@
+[Unit]
+Description=Dragon Lab OS port monitor
+
+[Service]
+ExecStart=/usr/bin/python3 -I %h/.local/bin/dragon-lab-os-monitor.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

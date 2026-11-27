@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import {
   getLabConfig,
   getLabLinkStatus,
+  getLabOSNodes,
   LAB_KEY,
   type LabLinkID,
   type LabNodeID,
@@ -68,6 +69,29 @@ export function DragonLab() {
     staleTime: 60000,
     retry: false,
   })
+  const inventory = useQuery({
+    queryKey: ['system', 'dragon-lab', 'os-nodes'],
+    queryFn: getLabOSNodes,
+    enabled: authorized,
+    refetchInterval: 10000,
+    retry: false,
+  })
+  const [osName, setOSName] = useState('Node-01')
+  const instances =
+    authorized && Array.isArray(inventory.data) ? inventory.data : []
+  const instance = instances.find((item) => item.name === osName)
+  const topology =
+    config.data && instance
+      ? {
+          ...config.data,
+          nodes: config.data.nodes.map(
+            (item) => instance.nodes.find((n) => n.id === item.id) ?? item
+          ),
+          links: config.data.links.map(
+            (item) => instance.links.find((n) => n.id === item.id) ?? item
+          ),
+        }
+      : config.data
   const machines = useQuery({
     queryKey: ['system', 'virtual-machines'],
     queryFn: async () => (await getVirtualMachines()).data,
@@ -112,7 +136,7 @@ export function DragonLab() {
     config.data?.nodes.filter(
       (node) => node.console_mode === 'remote' && node.console_id > 0
     ).length ?? 0
-  const link = config.data?.links.find((item) => item.id === selected)
+  const link = topology?.links.find((item) => item.id === selected)
   const refresh = () => {
     void config.refetch()
     void machines.refetch()
@@ -222,20 +246,33 @@ export function DragonLab() {
           >
             <div className='lab-summary'>
               <div>
-                <strong>05</strong>
+                <strong>
+                  {String(5 + 2 * instances.length).padStart(2, '0')}
+                </strong>
                 <span>{t('Topology nodes')}</span>
               </div>
               <div>
                 <strong>
                   {authorized && config.data
-                    ? String(bound).padStart(2, '0')
+                    ? String(
+                        bound +
+                          instances.reduce(
+                            (n, item) =>
+                              n +
+                              item.nodes.filter((node) => node.console_id > 0)
+                                .length,
+                            0
+                          )
+                      ).padStart(2, '0')
                     : '—'}
                 </strong>
                 <span>{t('Remote consoles bound')}</span>
               </div>
               <div>
                 <strong>
-                  {authorized && machines.data ? `${running}/2` : '—'}
+                  {authorized && machines.data
+                    ? `${running + instances.filter((item) => item.state === 'running').length}/${2 + instances.length}`
+                    : '—'}
                 </strong>
                 <span>{t('Lab VMs running')}</span>
               </div>
@@ -335,7 +372,8 @@ export function DragonLab() {
               <div className='lab-topology-shell'>
                 <div className='lab-canvas'>
                   <LabWiring
-                    config={authorized ? config.data : undefined}
+                    config={authorized ? topology : undefined}
+                    instanceStatus={instance?.status}
                     status={authorized ? linkStatus.data : undefined}
                     authorized={authorized}
                     onSelect={(id) => {
@@ -347,19 +385,45 @@ export function DragonLab() {
                     const machine = ['pc', 'os', 'ibmc'].includes(node.id)
                       ? machines.data?.find((vm) => vm.name === vmName)
                       : undefined
+                    const guest = node.id === 'os' || node.id === 'ibmc'
                     return (
                       <LabNode
-                        key={node.id}
+                        key={
+                          guest
+                            ? node.id + (instance?.name ?? 'Node-01')
+                            : node.id
+                        }
                         definition={node}
+                        instanceName={guest ? instance?.name : undefined}
+                        instanceState={guest ? instance?.state : undefined}
+                        osPicker={
+                          node.id === 'os' &&
+                          instances.length > 0 && (
+                            <select
+                              aria-label={t('Select node')}
+                              value={instance?.name ?? 'Node-01'}
+                              onChange={(event) =>
+                                setOSName(event.target.value)
+                              }
+                            >
+                              <option>Node-01</option>
+                              {instances.map((item) => (
+                                <option key={item.name}>{item.name}</option>
+                              ))}
+                            </select>
+                          )
+                        }
                         config={
                           authorized
-                            ? config.data?.nodes.find(
+                            ? topology?.nodes.find(
                                 (item) => item.id === node.id
                               )
                             : undefined
                         }
                         execution={
-                          authorized && config.data?.workbench_url
+                          authorized &&
+                          config.data?.workbench_url &&
+                          !(guest && instance)
                             ? {
                                 active: workbenchTaskActive(
                                   workbench.state?.task
@@ -374,14 +438,14 @@ export function DragonLab() {
                               }
                             : undefined
                         }
-                        machine={machine}
+                        machine={guest && instance ? undefined : machine}
                         authorized={authorized}
                         paused={paused}
                         expanded={expandedNode === node.id}
                         onExpandedChange={(expanded) =>
                           setExpandedNode(expanded ? node.id : null)
                         }
-                        serialReady={Boolean(ibmc.data?.serial)}
+                        serialReady={!instance && Boolean(ibmc.data?.serial)}
                         onConfigure={() => setSettings(true)}
                       />
                     )
@@ -401,7 +465,10 @@ export function DragonLab() {
             </TabsContent>
             <TabsContent value='ports'>
               {authorized && config.data && (
-                <LabPortMap config={config.data} onSelect={setSelected} />
+                <LabPortMap
+                  config={topology ?? config.data}
+                  onSelect={setSelected}
+                />
               )}
             </TabsContent>
           </Tabs>
@@ -420,6 +487,7 @@ export function DragonLab() {
         !detachedTool &&
         (tool || config.data.workbench_url) && (
           <LabTool
+            instances={instances}
             config={config.data}
             open={tool}
             frame={workbenchFrame}

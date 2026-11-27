@@ -53,6 +53,7 @@ func SetApiRouter(router *gin.Engine) {
 			labRoute.PUT("", middleware.UserCriticalRateLimit("dragon-lab"), controller.UpdateDragonLab)
 			labRoute.GET("/tool", controller.GetDragonLabTool)
 			labRoute.GET("/link-status", controller.GetDragonLabLinkStatus)
+			labRoute.GET("/os-nodes", controller.GetDragonLabOSNodes)
 			labRoute.POST("/factory-reset", middleware.UserCriticalRateLimit("dragon-lab-reset"), controller.ResetDragonLab)
 		}
 		ibmcRoute := apiRouter.Group("/system/ibmc")

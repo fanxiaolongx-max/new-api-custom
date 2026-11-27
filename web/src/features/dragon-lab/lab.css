@@ -1420,3 +1420,31 @@
     animation: none;
   }
 }
+
+.lab-wires g[data-state='down'] .lab-wire-line {
+  stroke: #dc5656;
+}
+.lab-wires g[data-state='warn'] .lab-wire-line {
+  stroke: #d49322;
+}
+.lab-wires g[data-state='unknown'] .lab-wire-line {
+  opacity: 0.45;
+}
+.lab-node-header select {
+  color: inherit;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lab-node-os,
+  .lab-node-ibmc {
+    animation: lab-os-enter 0.18s ease-out;
+  }
+  @keyframes lab-os-enter {
+    from {
+      opacity: 0.65;
+      transform: translateY(3px);
+    }
+  }
+}

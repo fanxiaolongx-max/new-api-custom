@@ -5,11 +5,18 @@ import { LAB_LINKS } from '../topology'
 
 export function LabWiring(props: {
   config?: LabConfig
+  instanceStatus?: LabLinkStatus
   status?: LabLinkStatus
   authorized: boolean
   onSelect: (id: LabLinkID) => void
 }) {
   const { t } = useTranslation()
+  const sample = (id: LabLinkID) =>
+    props.instanceStatus && id !== 'pc-sw1' && id !== 'pc-sw2'
+      ? props.instanceStatus
+      : props.status
+  const stale = (status?: LabLinkStatus) =>
+    !status || status.stale || Date.now() / 1000 - status.updated > 45
   return (
     <>
       <svg
@@ -20,8 +27,19 @@ export function LabWiring(props: {
       >
         {LAB_LINKS.map((link) => {
           const config = props.config?.links.find((item) => item.id === link.id)
+          const status = sample(link.id)
+          const states = status?.links[link.id]?.map(
+            (id) => status.endpoints[id]?.state ?? 'unknown'
+          )
+          const wireState =
+            stale(status) || !states
+              ? 'unknown'
+              : (['down', 'warn', 'unknown'].find((state) =>
+                  states.some((s) => s === state)
+                ) ?? 'up')
           return (
             <g
+              data-state={props.authorized ? wireState : undefined}
               key={link.id}
               className={`lab-wire-${link.kind} ${config?.phase === 'configured' ? 'is-configured' : 'is-planned'}`}
             >
@@ -64,16 +82,17 @@ export function LabWiring(props: {
         )
       })}
       {props.authorized &&
-        props.status &&
+        (props.status || props.instanceStatus) &&
         LAB_LINKS.flatMap((link) =>
-          (props.status?.links[link.id] ?? []).map((endpointID, index) => {
-            const endpoint = props.status?.endpoints[endpointID]
-            const state = props.status?.stale
+          (sample(link.id)?.links[link.id] ?? []).map((endpointID, index) => {
+            const status = sample(link.id)
+            const endpoint = status?.endpoints[endpointID]
+            const state = stale(status)
               ? 'unknown'
               : (endpoint?.state ?? 'unknown')
             const [x, y] = link.ends[index]
             const label = endpoint?.label ?? endpointID
-            const detail = props.status?.stale
+            const detail = stale(status)
               ? t('Port status is out of date')
               : (endpoint?.detail ?? t('No data'))
             return (

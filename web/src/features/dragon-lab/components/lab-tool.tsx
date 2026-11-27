@@ -6,9 +6,16 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-import { getLabTool, LAB_KEY, saveLabConfig, type LabConfig } from '../api'
+import {
+  getLabTool,
+  LAB_KEY,
+  saveLabConfig,
+  type LabConfig,
+  type LabOSInstance,
+} from '../api'
 
 export default function LabTool(props: {
+  instances?: LabOSInstance[]
   config: LabConfig
   onClose: () => void
   onDetach?: () => void
@@ -121,6 +128,45 @@ export default function LabTool(props: {
           <Settings2 size={14} />
           {t('Workbench address')}
         </Button>
+        {props.instances?.map((instance) => (
+          <Button
+            key={instance.name}
+            size='sm'
+            variant='outline'
+            disabled={props.running}
+            onClick={() => {
+              const os = instance.nodes.find((n) => n.id === 'os')
+              const mgmt = instance.links.find((link) => link.id === 'sw1-ibmc')
+              const ibmc = instance.nodes.find((n) => n.id === 'ibmc')
+              if (!os || !mgmt || !ibmc) return
+              const [ip, prefix] = os.address.split('/')
+              const frame = (
+                remoteURL ? (props.frame ?? localFrame) : localFrame
+              ).current
+              frame?.contentWindow?.postMessage(
+                {
+                  source: 'dragon-lab',
+                  version: 1,
+                  type: 'prefill-host',
+                  channel: crypto.randomUUID(),
+                  fields: {
+                    ehHostname: instance.name,
+                    ehMgmtPort: mgmt.source_port,
+                    ehOsIp: ip,
+                    ehPrefix: prefix,
+                    ehOsGw: os.gateway,
+                    ehIbmcIp: ibmc.address.split('→').at(-1)?.trim(),
+                  },
+                },
+                remoteURL && remoteSandbox.includes('allow-same-origin')
+                  ? new URL(remoteURL).origin
+                  : '*'
+              )
+            }}
+          >
+            {t('Add')} {instance.name}
+          </Button>
+        ))}
         {!remoteURL && (
           <Button
             size='sm'
@@ -196,7 +242,13 @@ export default function LabTool(props: {
             <iframe
               className='lab-tool-frame'
               title={t('Isolated TaiSha script generator')}
-              srcDoc={query.data}
+              ref={localFrame}
+              srcDoc={
+                query.data +
+                '<script src="' +
+                window.location.origin +
+                '/dragon-lab-workbench-bridge.js"></script>'
+              }
               sandbox='allow-scripts allow-forms allow-downloads allow-modals'
               referrerPolicy='no-referrer'
             />

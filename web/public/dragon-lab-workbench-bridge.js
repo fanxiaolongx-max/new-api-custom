@@ -151,6 +151,17 @@
     ) {
       return
     }
+    if (request.type === 'prefill-host') {
+      const fields = request.fields
+      if (!fields || typeof window.openHostModal !== 'function' ||
+          document.querySelector('#hostEditModal.open')) return
+      const ids = ['ehHostname', 'ehMgmtPort', 'ehIbmcIp', 'ehOsIp', 'ehPrefix', 'ehOsGw']
+      if (!ids.every((id) => typeof fields[id] === 'string' &&
+          fields[id].length > 0 && fields[id].length < 80 && document.getElementById(id))) return
+      window.openHostModal()
+      for (const id of ids) document.getElementById(id).value = fields[id]
+      return
+    }
     if (request.type === 'hello') {
       if (channel !== request.channel) completed.clear()
       channel = request.channel
