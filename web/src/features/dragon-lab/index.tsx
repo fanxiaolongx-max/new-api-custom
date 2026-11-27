@@ -11,8 +11,17 @@ import {
 } from 'lucide-react'
 import { lazy, Suspense, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { PublicLayout } from '@/components/layout'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/context/theme-provider'
@@ -27,12 +36,15 @@ import {
   getLabLinkStatus,
   getLabOSNodes,
   LAB_KEY,
+  labHostFields,
   type LabLinkID,
   type LabNodeID,
+  type LabOSInstance,
 } from './api'
 import { LabFactoryReset } from './components/lab-factory-reset'
 import { LabInfo } from './components/lab-info'
 import { LabNode } from './components/lab-node'
+import { LabOSSwitcher } from './components/lab-os-switcher'
 import { LabPortMap } from './components/lab-port-map'
 import { LabReadiness } from './components/lab-readiness'
 import LabTool from './components/lab-tool'
@@ -44,6 +56,9 @@ import { workbenchTaskActive } from './workbench-task'
 import './lab.css'
 
 const LabSettings = lazy(() => import('./components/lab-settings'))
+// Node-01 is the original openEuler guest described by the saved topology.
+const BASE_NODE = 'Node-01'
+const OS_NODE_KEY = 'dragon-lab-os-node'
 export function DragonLab() {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
@@ -76,9 +91,20 @@ export function DragonLab() {
     refetchInterval: 10000,
     retry: false,
   })
-  const [osName, setOSName] = useState('Node-01')
-  const instances =
+  const [osName, setOSName] = useState(() => {
+    try {
+      return localStorage.getItem(OS_NODE_KEY) || BASE_NODE
+    } catch {
+      return BASE_NODE
+    }
+  })
+  const [slide, setSlide] = useState<'next' | 'prev'>('next')
+  const [dismissed, setDismissed] = useState<string[]>([])
+  const [removing, setRemoving] = useState<string | null>(null)
+  const instances = (
     authorized && Array.isArray(inventory.data) ? inventory.data : []
+  ).filter((item) => item.name !== BASE_NODE)
+  const nodeNames = [BASE_NODE, ...instances.map((item) => item.name)]
   const instance = instances.find((item) => item.name === osName)
   const topology =
     config.data && instance
@@ -125,6 +151,89 @@ export function DragonLab() {
         : null
     setDetachedTool(false)
     setTool(true)
+  }
+  const switchNode = (name: string, direction: 'next' | 'prev') => {
+    setSlide(direction)
+    setOSName(name)
+    try {
+      localStorage.setItem(OS_NODE_KEY, name)
+    } catch {
+      // Remembering the last node is a convenience only.
+    }
+  }
+  const workbenchHosts = workbench.state?.hosts
+  // Guests already in the workbench (matched by host name) need no import prompt.
+  const unimported = workbenchHosts
+    ? instances.filter(
+        (item) =>
+          !workbenchHosts.some(
+            (host) =>
+              host.hostname.trim().toLowerCase() === item.name.toLowerCase()
+          )
+      )
+    : []
+  // Workbench host names (as the workbench spells them) of provisioned guests;
+  // Node-01 and hand-made hosts are never offered for one-click removal.
+  const removable = (workbenchHosts ?? [])
+    .map((host) => host.hostname)
+    .filter((hostname) =>
+      instances.some(
+        (item) => item.name.toLowerCase() === hostname.trim().toLowerCase()
+      )
+    )
+  const taskBusy =
+    workbench.pending || workbenchTaskActive(workbench.state?.task)
+  const removeHost = async (hostname: string) => {
+    setRemoving(null)
+    const result = await workbench.editHost({
+      type: 'remove-host',
+      hostname,
+    })
+    if (result === 'removed') {
+      toast.success(
+        t('{{name}} removed from the workbench', { name: hostname })
+      )
+    } else if (result === 'missing') {
+      toast.info(
+        t('{{name}} is no longer in the workbench', { name: hostname })
+      )
+    } else if (result === 'last') {
+      toast.error(t('The workbench must keep at least one host'))
+    } else {
+      toast.error(
+        t('The workbench could not remove {{name}}. Reload it and retry.', {
+          name: hostname,
+        })
+      )
+    }
+  }
+  const importHost = async (item: LabOSInstance) => {
+    const fields = labHostFields(item)
+    if (!fields) {
+      toast.error(
+        t('{{name}} is missing an address in the lab inventory', {
+          name: item.name,
+        })
+      )
+      return
+    }
+    openTool()
+    const result = await workbench.editHost({ type: 'prefill-host', fields })
+    if (result === 'opened') {
+      toast.success(
+        t('Review {{name}} in the workbench, then save the host', {
+          name: item.name,
+        })
+      )
+    } else if (result === 'exists') {
+      toast.info(t('{{name}} is already in the workbench', { name: item.name }))
+    } else if (result === 'busy') {
+      toast.error(t('Close the open host dialog in the workbench first'))
+    } else {
+      toast.error(
+        t('The workbench could not open the host dialog. Reload it and retry.')
+      )
+    }
   }
   const running =
     machines.data?.filter(
@@ -199,7 +308,7 @@ export function DragonLab() {
                 {paused ? <Play size={14} /> : <Pause size={14} />}{' '}
                 {paused ? t('Resume live views') : t('Pause live views')}
               </Button>
-              <LabFactoryReset disabled={!authorized} />
+              <LabFactoryReset disabled={!authorized} nodes={nodeNames} />
               <Button
                 size='sm'
                 disabled={!authorized || !config.data}
@@ -390,7 +499,7 @@ export function DragonLab() {
                       <LabNode
                         key={
                           guest
-                            ? node.id + (instance?.name ?? 'Node-01')
+                            ? node.id + (instance?.name ?? BASE_NODE)
                             : node.id
                         }
                         definition={node}
@@ -399,19 +508,15 @@ export function DragonLab() {
                         osPicker={
                           node.id === 'os' &&
                           instances.length > 0 && (
-                            <select
-                              aria-label={t('Select node')}
-                              value={instance?.name ?? 'Node-01'}
-                              onChange={(event) =>
-                                setOSName(event.target.value)
-                              }
-                            >
-                              <option>Node-01</option>
-                              {instances.map((item) => (
-                                <option key={item.name}>{item.name}</option>
-                              ))}
-                            </select>
+                            <LabOSSwitcher
+                              names={nodeNames}
+                              current={instance?.name ?? BASE_NODE}
+                              onChange={switchNode}
+                            />
                           )
+                        }
+                        slide={
+                          guest && instances.length > 0 ? slide : undefined
                         }
                         config={
                           authorized
@@ -421,10 +526,11 @@ export function DragonLab() {
                             : undefined
                         }
                         execution={
-                          authorized &&
-                          config.data?.workbench_url &&
-                          !(guest && instance)
+                          authorized && config.data?.workbench_url
                             ? {
+                                target: guest
+                                  ? workbench.state?.task?.currentTarget
+                                  : undefined,
                                 active: workbenchTaskActive(
                                   workbench.state?.task
                                 ),
@@ -445,7 +551,12 @@ export function DragonLab() {
                         onExpandedChange={(expanded) =>
                           setExpandedNode(expanded ? node.id : null)
                         }
-                        serialReady={!instance && Boolean(ibmc.data?.serial)}
+                        serialReady={
+                          instance
+                            ? instance.state === 'running'
+                            : Boolean(ibmc.data?.serial)
+                        }
+                        serialNode={instance?.name}
                         onConfigure={() => setSettings(true)}
                       />
                     )
@@ -459,6 +570,21 @@ export function DragonLab() {
                     connected={workbench.connected}
                     pendingAction={workbench.pendingAction}
                     actionError={workbench.error}
+                    scope={workbenchHosts
+                      ?.filter((host) => host.enabled)
+                      .map((host) => host.hostname)}
+                    newHosts={unimported
+                      .filter((item) => !dismissed.includes(item.name))
+                      .map((item) => item.name)}
+                    onImport={(name) => {
+                      const item = instances.find((i) => i.name === name)
+                      if (item) void importHost(item)
+                    }}
+                    onDismiss={(name) =>
+                      setDismissed((list) => [...list, name])
+                    }
+                    removable={taskBusy ? [] : removable}
+                    onRemove={setRemoving}
                   />
                 </div>
               </div>
@@ -487,7 +613,10 @@ export function DragonLab() {
         !detachedTool &&
         (tool || config.data.workbench_url) && (
           <LabTool
-            instances={instances}
+            instances={workbenchHosts ? unimported : instances}
+            onImport={config.data.workbench_url ? importHost : undefined}
+            removable={config.data.workbench_url ? removable : undefined}
+            onRemove={setRemoving}
             config={config.data}
             open={tool}
             frame={workbenchFrame}
@@ -506,6 +635,35 @@ export function DragonLab() {
             }}
           />
         )}
+      <AlertDialog
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader className='text-start'>
+            <AlertDialogTitle>
+              {t('Remove {{name}} from the workbench?', { name: removing })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                'Only the host entry in the workbench is deleted. The virtual machine and topology stay as they are, and you can add it again at any time.'
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant='outline' onClick={() => setRemoving(null)}>
+              {t('Cancel')}
+            </Button>
+            <Button
+              variant='destructive'
+              disabled={taskBusy}
+              onClick={() => removing && void removeHost(removing)}
+            >
+              {t('Remove from workbench')}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PublicLayout>
   )
 }

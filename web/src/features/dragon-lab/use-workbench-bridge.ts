@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
+import type { LabHostFields } from './api'
 import {
   WORKBENCH_ACTIONS,
   readWorkbenchTask,
@@ -13,7 +14,51 @@ import {
 
 export { WORKBENCH_ACTIONS, type WorkbenchAction } from './workbench-task'
 
+export interface WorkbenchHost {
+  hostname: string
+  enabled: boolean
+}
+// Outcome of a host edit the bridge performs: opening the prefilled "add host"
+// dialog, or removing a host through the workbench's own delete action.
+export type WorkbenchHostResult =
+  | 'opened'
+  | 'exists'
+  | 'busy'
+  | 'removed'
+  | 'missing'
+  | 'last'
+  | 'failed'
+  | 'invalid'
+  | 'unsupported'
+  | 'timeout'
+const HOST_RESULTS = [
+  'opened',
+  'exists',
+  'busy',
+  'removed',
+  'missing',
+  'last',
+  'failed',
+  'invalid',
+  'unsupported',
+]
+
+// Older bridges omit the host list; null means "unknown", not "empty".
+function readWorkbenchHosts(value: unknown): WorkbenchHost[] | null {
+  if (!Array.isArray(value)) return null
+  return value
+    .filter(
+      (host): host is WorkbenchHost =>
+        Boolean(host) &&
+        typeof host.hostname === 'string' &&
+        host.hostname.length <= 80 &&
+        typeof host.enabled === 'boolean'
+    )
+    .slice(0, 200)
+}
+
 export interface WorkbenchState {
+  hosts?: WorkbenchHost[] | null
   terminalAPI?: boolean
   executionTerminals?: ExecutionTerminal[]
   taskAPI?: boolean
@@ -48,6 +93,9 @@ export function useWorkbenchBridge(props: {
   const request = useRef('')
   const lastReply = useRef(0)
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const hostRequests = useRef(
+    new Map<string, (result: WorkbenchHostResult) => void>()
+  )
   const handshake = useCallback(() => {
     if (!url || !frame.current?.contentWindow) return
     frame.current.contentWindow.postMessage(
@@ -117,6 +165,7 @@ export function useWorkbenchBridge(props: {
             task = old
           }
           return {
+            hosts: readWorkbenchHosts(message.hosts),
             buttons: message.buttons,
             counts,
             terminalAPI: message.terminalAPI === true,
@@ -137,6 +186,13 @@ export function useWorkbenchBridge(props: {
             task,
           }
         })
+      } else if (message.type === 'host-result') {
+        const resolve = hostRequests.current.get(message.id)
+        if (!resolve) return
+        hostRequests.current.delete(message.id)
+        resolve(
+          HOST_RESULTS.includes(message.result) ? message.result : 'unsupported'
+        )
       } else if (message.type === 'ack' && message.id === request.current) {
         clearTimeout(timeout.current)
         request.current = ''
@@ -200,6 +256,40 @@ export function useWorkbenchBridge(props: {
     },
     [connected, frame, state, url]
   )
+  const editHost = useCallback(
+    (
+      request:
+        | { type: 'prefill-host'; fields: LabHostFields }
+        | { type: 'remove-host'; hostname: string }
+    ) =>
+      new Promise<WorkbenchHostResult>((resolve) => {
+        const target = frame.current?.contentWindow
+        if (!target || !url || !connected) {
+          resolve('unsupported')
+          return
+        }
+        const id = crypto.randomUUID()
+        const timer = setTimeout(() => {
+          hostRequests.current.delete(id)
+          resolve('timeout')
+        }, 5000)
+        hostRequests.current.set(id, (result) => {
+          clearTimeout(timer)
+          resolve(result)
+        })
+        target.postMessage(
+          {
+            source: 'dragon-lab',
+            version: 1,
+            channel: channel.current,
+            id,
+            ...request,
+          },
+          new URL(url).origin
+        )
+      }),
+    [connected, frame, url]
+  )
   const loaded = useCallback(() => {
     setError(null)
     setState(null)
@@ -219,6 +309,7 @@ export function useWorkbenchBridge(props: {
     pending,
     pendingAction,
     run,
+    editHost,
     handshake,
     loaded,
   }

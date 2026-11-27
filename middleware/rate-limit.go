@@ -168,11 +168,13 @@ func GlobalAPIRateLimit() func(c *gin.Context) {
 	if common.GlobalApiRateLimitEnable {
 		limiter := rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
 		return func(c *gin.Context) {
-			// Nginx calls this endpoint for every protected subrequest. Long-lived
-			// HTTP tunnels can generate several checks per second during normal use,
-			// so counting them against the client-wide API budget would eventually
-			// block unrelated dashboard and login requests from the same address.
-			if c.Request.Method == http.MethodGet && c.Request.URL.Path == "/api/logs/auth" {
+			// Nginx calls these endpoints for every protected subrequest (logs and
+			// each Guacamole console asset). Long-lived HTTP tunnels and several lab
+			// consoles generate many checks per second during normal use, so counting
+			// them against the client-wide API budget would eventually block unrelated
+			// dashboard, login and lab requests from the same address.
+			if c.Request.Method == http.MethodGet && (c.Request.URL.Path == "/api/logs/auth" ||
+				c.Request.URL.Path == "/api/system/lab/console/auth") {
 				c.Next()
 				return
 			}

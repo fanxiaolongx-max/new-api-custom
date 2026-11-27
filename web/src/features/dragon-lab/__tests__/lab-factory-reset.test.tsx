@@ -5,10 +5,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { LabFactoryReset } from '../components/lab-factory-reset'
 
-const mocks = vi.hoisted(() => ({ factoryResetLab: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  factoryResetLab: vi.fn(),
+  getLabFactoryStatus: vi.fn(),
+}))
 vi.mock('../api', async () => ({
   ...(await vi.importActual('../api')),
   factoryResetLab: mocks.factoryResetLab,
+  getLabFactoryStatus: mocks.getLabFactoryStatus,
 }))
 
 function renderReset() {
@@ -34,7 +38,50 @@ async function openAndConfirm() {
 }
 
 describe('lab factory reset', () => {
-  beforeEach(() => mocks.factoryResetLab.mockReset())
+  beforeEach(() => {
+    mocks.factoryResetLab.mockReset()
+    mocks.getLabFactoryStatus.mockReset()
+    mocks.getLabFactoryStatus.mockResolvedValue({
+      updated: 0,
+      state: 'unknown',
+      checks: [],
+    })
+  })
+
+  test('glows green only when every node already matches factory state', async () => {
+    mocks.getLabFactoryStatus.mockResolvedValue({
+      updated: 1,
+      state: 'factory',
+      checks: [],
+    })
+    const view = renderReset()
+    const button = screen.getByRole('button', { name: 'Factory reset' })
+    await vi.waitFor(() => expect(button).toHaveClass('lab-factory-clean'))
+    view.unmount()
+
+    mocks.getLabFactoryStatus.mockResolvedValue({
+      updated: 1,
+      state: 'modified',
+      checks: [
+        {
+          node: 'Node-02',
+          item: 'sw1',
+          target: 'GE0/0/3',
+          expected: 'access 102',
+          actual: 'access 10',
+          ok: false,
+        },
+      ],
+    })
+    renderReset()
+    const modified = screen.getByRole('button', { name: 'Factory reset' })
+    await vi.waitFor(() =>
+      expect(modified.title).toContain(
+        'Node-02 SW1 iBMC port GE0/0/3: access 10 → access 102'
+      )
+    )
+    expect(modified).not.toHaveClass('lab-factory-clean')
+  })
 
   test('asks for confirmation before resetting anything', async () => {
     const user = userEvent.setup()

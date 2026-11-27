@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
@@ -48,7 +49,12 @@ type ibmcSerialRequest struct {
 	Operation string `json:"operation" binding:"required,oneof=open write close"`
 	Session   string `json:"session,omitempty" binding:"max=64"`
 	Data      string `json:"data,omitempty" binding:"max=5500"`
+	// Node selects a provisioned lab guest's COM1; empty means the original openEuler.
+	Node string `json:"node,omitempty" binding:"omitempty,max=16"`
 }
+
+// Lab guests are named Node-NN by the provisioning slots.
+var ibmcSerialNodePattern = regexp.MustCompile(`^Node-[0-9]{2,3}$`)
 
 func WriteIBMCSerial(c *gin.Context) {
 	if _, ok := middleware.GetSessionAuthIdentity(c); !ok {
@@ -58,6 +64,10 @@ func WriteIBMCSerial(c *gin.Context) {
 	var request ibmcSerialRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(400, gin.H{"success": false, "message": "Invalid serial request"})
+		return
+	}
+	if request.Node != "" && !ibmcSerialNodePattern.MatchString(request.Node) {
+		c.JSON(400, gin.H{"success": false, "message": "Invalid serial node"})
 		return
 	}
 	// Keystrokes are private terminal traffic, not one administrative audit per key.
@@ -78,11 +88,17 @@ func ReadIBMCSerial(c *gin.Context) {
 	}
 	cursor, err := strconv.ParseInt(c.Query("cursor"), 10, 64)
 	session := c.GetHeader("X-IBMC-Session")
-	if err != nil || cursor < 0 || len(session) > 64 || session == "" {
+	node := c.Query("node")
+	if err != nil || cursor < 0 || len(session) > 64 || session == "" ||
+		(node != "" && !ibmcSerialNodePattern.MatchString(node)) {
 		c.JSON(400, gin.H{"success": false, "message": "Invalid serial cursor or session"})
 		return
 	}
-	data, err := service.CallIBMC(http.MethodGet, "/v1/ibmc/serial?session="+url.QueryEscape(session)+"&cursor="+strconv.FormatInt(cursor, 10), nil)
+	query := "/v1/ibmc/serial?session=" + url.QueryEscape(session) + "&cursor=" + strconv.FormatInt(cursor, 10)
+	if node != "" {
+		query += "&node=" + url.QueryEscape(node)
+	}
+	data, err := service.CallIBMC(http.MethodGet, query, nil)
 	if err != nil {
 		writeVirtualMachineError(c, err)
 		return

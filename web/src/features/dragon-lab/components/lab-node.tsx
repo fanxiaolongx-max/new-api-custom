@@ -33,10 +33,13 @@ export function LabNode(props: {
     connected: boolean
     available: boolean
     active?: boolean
+    target?: string
   }
   instanceName?: string
   instanceState?: string
   osPicker?: React.ReactNode
+  slide?: 'next' | 'prev'
+  serialNode?: string
   definition: NodeDefinition
   config?: LabNodeConfig
   machine?: VirtualMachine
@@ -128,7 +131,12 @@ export function LabNode(props: {
         fallback={<div className='lab-placeholder'>{t('Loading...')}</div>}
       >
         <div className='lab-sol'>
-          <SerialConsole autoConnect compact autoLogin />
+          <SerialConsole
+            autoConnect
+            compact
+            autoLogin
+            node={props.serialNode}
+          />
         </div>
       </Suspense>
     )
@@ -160,7 +168,12 @@ export function LabNode(props: {
               }
             >
               <div className='lab-sol'>
-                <SerialConsole autoConnect compact autoLogin />
+                <SerialConsole
+                  autoConnect
+                  compact
+                  autoLogin
+                  node={props.serialNode}
+                />
               </div>
             </Suspense>
           </TabsContent>
@@ -171,6 +184,7 @@ export function LabNode(props: {
   return (
     <article
       className={`lab-node lab-node-${node.id} ${props.expanded ? 'is-expanded' : ''}`}
+      data-slide={props.slide}
       style={{ gridColumn: node.column, gridRow: node.row }}
       role={props.expanded ? 'dialog' : undefined}
       aria-modal={props.expanded ? false : undefined}

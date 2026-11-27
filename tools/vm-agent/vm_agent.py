@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from ibmc import IBMC
+from ibmc import IBMC, SerialConsole
 import os
 import re
 import socket
@@ -122,6 +122,24 @@ def managed_vm_names() -> tuple[str, ...]:
         for line in run_vbox("list", "vms").splitlines()
     }
     return tuple(dict.fromkeys((*ALLOWED_VMS, *(vm for vm in candidates if vm in registered))))
+
+
+def lab_guest_serial_path(node: str) -> Path | None:
+    """COM1 socket of a provisioned lab slot such as Node-02, or None."""
+    if not re.fullmatch(r"Node-[0-9]{2,3}", node):
+        return None
+    try:
+        slots = json.loads(LAB_SLOTS_PATH.read_text())
+    except (OSError, ValueError):
+        return None
+    vm = next((slot.get("vm") for slot in slots if isinstance(slot, dict)
+               and slot.get("name") == node), None) if isinstance(slots, list) else None
+    if not isinstance(vm, str) or not re.fullmatch(r"DragonLab-Node-[0-9]+", vm):
+        return None
+    mode = machine_readable_values(vm).get("uartmode1", "")
+    if not mode.startswith("server,"):
+        return None
+    return Path(mode.removeprefix("server,"))
 
 
 def machine_readable_values(name: str) -> dict[str, str]:
@@ -281,6 +299,8 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
         self.control_lock = threading.Lock()
         self.ibmc = IBMC(run_vbox, machine_readable_values)
         self.ibmc.serial.start()
+        self.guest_serials: dict[str, SerialConsole] = {}
+        self.guest_serials_lock = threading.Lock()
         self.settings_lock = threading.Lock()
         self.next_lifecycle_check = time.monotonic()
         self.idle_save_minutes = load_idle_save_minutes()
@@ -342,8 +362,28 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
         super().server_bind()
         os.chmod(socket_path, 0o660)
 
+    def serial_for(self, node: str) -> SerialConsole | None:
+        if not node:
+            return self.ibmc.serial
+        with self.guest_serials_lock:
+            console = self.guest_serials.get(node)
+            if console is None:
+                path = lab_guest_serial_path(node)
+                if path is None:
+                    return None
+                console = SerialConsole(path)
+                console.start()
+                self.guest_serials[node] = console
+                # The first open must not race the reader thread's socket connect.
+                deadline = time.monotonic() + 2
+                while console.connection is None and time.monotonic() < deadline:
+                    time.sleep(0.05)
+            return console
+
     def server_close(self) -> None:
         self.ibmc.serial.stop()
+        for console in self.guest_serials.values():
+            console.stop()
         socket_path = Path(self.server_address)
         super().server_close()
         if socket_path.exists():
@@ -420,7 +460,11 @@ class Handler(BaseHTTPRequestHandler):
             if urlparse(self.path).path == "/v1/ibmc/serial":
                 from urllib.parse import parse_qs
                 query = parse_qs(urlparse(self.path).query)
-                self.send_json(200, self.server.ibmc.serial.request({"operation": "read", "session": query.get("session", [""])[0], "cursor": int(query.get("cursor", ["0"])[0])}))
+                console = self.server.serial_for(query.get("node", [""])[0])
+                if console is None:
+                    self.send_json(404, {"error": "unknown serial node"})
+                    return
+                self.send_json(200, console.request({"operation": "read", "session": query.get("session", [""])[0], "cursor": int(query.get("cursor", ["0"])[0])}))
                 return
             if urlparse(self.path).path == "/v1/settings":
                 self.send_json(
@@ -486,10 +530,16 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/ibmc/serial":
                 payload = self.read_json()
+                node = payload.get("node", "")
+                console = self.server.serial_for(node if isinstance(node, str) else "")
+                if console is None:
+                    self.send_json(404, {"error": "unknown serial node"})
+                    return
+                payload.pop("node", None)
                 if payload.get("operation") == "open":
-                    result = self.server.ibmc.serial.open(auto_login=payload.get("auto_login") is True)
+                    result = console.open(auto_login=payload.get("auto_login") is True)
                 else:
-                    result = self.server.ibmc.serial.request(payload)
+                    result = console.request(payload)
                 self.send_json(200, result)
                 return
             name, suffix = self.route()

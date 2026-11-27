@@ -153,3 +153,54 @@ test('unknown stop progress has no percentage, and disconnect does not report a 
   ).toBeInTheDocument()
   expect(screen.queryByRole('alert')).toBeNull()
 })
+
+test('provisioned nodes can be imported into and removed from the workbench, and actions name their hosts', async () => {
+  const onImport = vi.fn()
+  const onDismiss = vi.fn()
+  const onRemove = vi.fn()
+  render(
+    <LabReadiness
+      authorized
+      onTool={vi.fn()}
+      newHosts={['Node-02']}
+      onImport={onImport}
+      onDismiss={onDismiss}
+      scope={['Node-01', 'Node-02']}
+      removable={['Node-02']}
+      onRemove={onRemove}
+      workbench={{
+        buttons: {
+          reach: true,
+          dryrun: true,
+          selected: true,
+          stage1: true,
+          stage2: true,
+          stop: false,
+        },
+        counts: {
+          total: 2,
+          running: 0,
+          pass: 0,
+          warn: 0,
+          fail: 0,
+          terminals: 0,
+        },
+      }}
+    />
+  )
+  expect(screen.getByText('Applies to:')).toHaveTextContent(
+    'Applies to:Node-01Node-02'
+  )
+  // Only provisioned guests can be removed; Node-01 has no remove control.
+  expect(
+    screen.queryByRole('button', { name: 'Remove Node-01 from the workbench' })
+  ).toBeNull()
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Remove Node-02 from the workbench' })
+  )
+  expect(onRemove).toHaveBeenCalledExactlyOnceWith('Node-02')
+  await userEvent.click(screen.getByRole('button', { name: 'Add to lab' }))
+  expect(onImport).toHaveBeenCalledExactlyOnceWith('Node-02')
+  await userEvent.click(screen.getByRole('button', { name: 'Later' }))
+  expect(onDismiss).toHaveBeenCalledExactlyOnceWith('Node-02')
+})

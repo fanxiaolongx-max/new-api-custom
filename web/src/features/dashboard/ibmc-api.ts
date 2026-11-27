@@ -63,17 +63,23 @@ export async function serialIBMC(request: {
   auto_login?: boolean
   session?: string
   data?: string
+  // A provisioned lab guest such as Node-02; omitted for the original openEuler.
+  node?: string
 }): Promise<{ session: string; cursor: number }> {
   const response = await api.post<{
     data: { session: string; cursor: number }
   }>('/api/system/ibmc/serial', request, { skipErrorHandler: true })
   return response.data.data
 }
-export async function readIBMCSerial(session: string, cursor: number) {
+export async function readIBMCSerial(
+  session: string,
+  cursor: number,
+  node?: string
+) {
   const response = await api.get<{
     data: { cursor: number; data: string; truncated: boolean }
   }>('/api/system/ibmc/serial', {
-    params: { cursor },
+    params: node ? { cursor, node } : { cursor },
     headers: { 'X-IBMC-Session': session },
     skipErrorHandler: true,
   })

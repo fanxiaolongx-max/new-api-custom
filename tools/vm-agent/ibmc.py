@@ -28,7 +28,9 @@ SERIAL_LEASE_SECONDS = 120
 
 
 class SerialConsole:
-    def __init__(self):
+    def __init__(self, path=None):
+        # Each lab guest has its own VirtualBox COM1 socket; the default is openEuler's.
+        self.path = Path(path) if path else SERIAL_PATH
         self.lock = threading.RLock()
         self.connection = None
         self.token = ""
@@ -102,7 +104,7 @@ class SerialConsole:
             connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             connection.settimeout(1)
             try:
-                connection.connect(str(SERIAL_PATH))
+                connection.connect(str(self.path))
                 with self.lock:
                     self.connection = connection
                 while True:

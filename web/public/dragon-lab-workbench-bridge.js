@@ -1,5 +1,5 @@
 /* Dragon Lab / TaiSha bridge v1. Only the allowlisted parent can invoke the six
- * existing buttons. Only explicitly redacted terminal snapshots may be mirrored; no input is forwarded. */
+ * existing buttons or open a prefilled "add host" dialog, and it learns host names only. Only explicitly redacted terminal snapshots may be mirrored; no input is forwarded. */
 ;(() => {
   'use strict'
   const allowedOrigin = 'https://api2.fanxiaolong.uk'
@@ -94,9 +94,101 @@
     }
     return api
   }
+  // The inventory lives inside the workbench closure; its saved copy (passwords stripped)
+  // is the readable source of truth.
+  function savedInventory() {
+    try {
+      const inventory = JSON.parse(
+        localStorage.getItem('taisha_v22_sop_single_v1') || 'null'
+      )?.hostInventory
+      return Array.isArray(inventory) ? inventory : null
+    } catch {
+      return null
+    }
+  }
+  // Removes one host through the workbench's own delete action, so its changelog,
+  // scripts and saved state stay consistent; the user re-adds it with prefill-host.
+  function removeHost(hostname) {
+    if (typeof hostname !== 'string' || !hostname || hostname.length >= 80) {
+      return 'invalid'
+    }
+    const inventory = savedInventory()
+    if (!inventory || typeof window.deleteHost !== 'function') {
+      return 'unsupported'
+    }
+    const name = hostname.trim().toLowerCase()
+    const host = inventory.find(
+      (item) =>
+        item &&
+        typeof item.hostname === 'string' &&
+        item.hostname.trim().toLowerCase() === name
+    )
+    if (!host) return 'missing'
+    if (inventory.length <= 1) return 'last'
+    window.deleteHost(host.uid)
+    return (savedInventory() || []).some((item) => item?.uid === host.uid)
+      ? 'failed'
+      : 'removed'
+  }
+  // Host names only: the rest of each row never leaves the workbench.
+  function hostSummary() {
+    const inventory = savedInventory()
+    if (!Array.isArray(inventory)) return null
+    return inventory
+      .slice(0, 200)
+      .filter((host) => host && typeof host.hostname === 'string')
+      .map((host) => ({
+        hostname: host.hostname.slice(0, 80),
+        enabled: host.enabled !== false,
+      }))
+  }
+  function prefillHost(fields) {
+    const ids = [
+      'ehHostname',
+      'ehMgmtPort',
+      'ehIbmcIp',
+      'ehOsIp',
+      'ehPrefix',
+      'ehOsGw',
+    ]
+    if (
+      !fields ||
+      !ids.every(
+        (id) =>
+          typeof fields[id] === 'string' &&
+          fields[id].length > 0 &&
+          fields[id].length < 80
+      )
+    ) {
+      return 'invalid'
+    }
+    if (
+      typeof window.openHostModal !== 'function' ||
+      !ids.every((id) => document.getElementById(id))
+    ) {
+      return 'unsupported'
+    }
+    const name = fields.ehHostname.trim().toLowerCase()
+    if (
+      (hostSummary() || []).some(
+        (host) => host.hostname.trim().toLowerCase() === name
+      )
+    ) {
+      return 'exists'
+    }
+    if (document.querySelector('#hostEditModal.open')) return 'busy'
+    window.openHostModal()
+    for (const id of ids) document.getElementById(id).value = fields[id]
+    document.getElementById('ehHostname').focus()
+    return 'opened'
+  }
   function state() {
     const api = workbenchAPI()
-    const canStream = Boolean(api && typeof api.getTerminalSnapshot === 'function' && typeof api.subscribeTerminals === 'function')
+    const canStream = Boolean(
+      api &&
+      typeof api.getTerminalSnapshot === 'function' &&
+      typeof api.subscribeTerminals === 'function'
+    )
     if (canStream && terminalAPI !== api) {
       unsubscribeTerminals?.()
       terminalAPI = api
@@ -109,8 +201,29 @@
     if (canStream) {
       try {
         const snapshot = api.getTerminalSnapshot()
-        if (Array.isArray(snapshot?.streams)) streams = snapshot.streams.slice(0, 5).filter((stream) => stream?.redacted === true && ['pc', 'sw1', 'sw2', 'ibmc', 'os'].includes(stream.nodeId) && typeof stream.text === 'string' && stream.text.length <= 16000).map((stream) => ({ nodeId: stream.nodeId, sessionId: stream.sessionId, runId: stream.runId, seq: stream.seq, text: stream.text, status: stream.status, redacted: true }))
-      } catch { /* A failed feed must not prevent task controls from working. */ }
+        if (Array.isArray(snapshot?.streams)) {
+          streams = snapshot.streams
+            .slice(0, 5)
+            .filter(
+              (stream) =>
+                stream?.redacted === true &&
+                ['pc', 'sw1', 'sw2', 'ibmc', 'os'].includes(stream.nodeId) &&
+                typeof stream.text === 'string' &&
+                stream.text.length <= 16000
+            )
+            .map((stream) => ({
+              nodeId: stream.nodeId,
+              sessionId: stream.sessionId,
+              runId: stream.runId,
+              seq: stream.seq,
+              text: stream.text,
+              status: stream.status,
+              redacted: true,
+            }))
+        }
+      } catch {
+        /* A failed feed must not prevent task controls from working. */
+      }
     }
     const available = {}
     for (const [action, id] of Object.entries(buttons)) {
@@ -129,6 +242,7 @@
     }
     reply({
       type: 'state',
+      hosts: hostSummary(),
       buttons: available,
       counts,
       terminalAPI: canStream,
@@ -151,15 +265,26 @@
     ) {
       return
     }
-    if (request.type === 'prefill-host') {
-      const fields = request.fields
-      if (!fields || typeof window.openHostModal !== 'function' ||
-          document.querySelector('#hostEditModal.open')) return
-      const ids = ['ehHostname', 'ehMgmtPort', 'ehIbmcIp', 'ehOsIp', 'ehPrefix', 'ehOsGw']
-      if (!ids.every((id) => typeof fields[id] === 'string' &&
-          fields[id].length > 0 && fields[id].length < 80 && document.getElementById(id))) return
-      window.openHostModal()
-      for (const id of ids) document.getElementById(id).value = fields[id]
+    if (request.type === 'prefill-host' || request.type === 'remove-host') {
+      // Only the connected parent channel may edit hosts; adding still needs the user's save.
+      if (
+        request.channel !== channel ||
+        typeof request.id !== 'string' ||
+        !/^[a-zA-Z0-9-]{8,80}$/.test(request.id)
+      ) {
+        return
+      }
+      let result
+      try {
+        result =
+          request.type === 'prefill-host'
+            ? prefillHost(request.fields)
+            : removeHost(request.hostname)
+      } catch {
+        result = 'unsupported'
+      }
+      reply({ type: 'host-result', id: request.id, result })
+      if (request.type === 'remove-host') state()
       return
     }
     if (request.type === 'hello') {

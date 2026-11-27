@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Factory-reset the TaiShan lab so the deployment scripts can be re-run from scratch:
+#   1) SW1 (eNSP, console 127.0.0.1:2000): Node-01's GigabitEthernet0/0/2 back to default
+#      (hybrid / VLAN 1); every provisioned slot's iBMC port back to its parking access VLAN
+#      (e.g. Node-02 GE0/0/3 -> VLAN 102), so two factory iBMCs never share VLAN 10; then save.
+#   2) Every OS guest (Node-01 on 13393, slots from lab-os-slots.json): iBMC simulator back to
+#      192.168.2.100, bond removed, sshd_config restored, SELinux enforcing, NAT route restored.
+# Prints step lines and finishes with RESET_OK or RESET_FAIL. Safe to run repeatedly.
+# Deployed copy: ~/.local/bin/taishan-lab-reset (run by taishan-lab-reset-daemon.py).
+set -u
+LAB=/mnt/data/TOOL/HUAWEI-CE/taishan-lab
+SLOTS=/var/lib/new-api-vm-agent/lab-os-slots.json
+exec 9>/tmp/taishan-lab-reset.lock
+if ! flock -w 5 9; then echo "RESET_FAIL another reset is already running"; exit 2; fi
+
+# name ssh-port mgmt-port parking-vlan, one guest per line; Node-01 is the original openEuler.
+guests=$(python3 -I - "$SLOTS" <<'EOF'
+import json, re, sys
+print("Node-01 13393 GE0/0/2 1")
+try:
+    slots = json.load(open(sys.argv[1]))
+except (OSError, ValueError):
+    slots = []
+for s in slots if isinstance(slots, list) else []:
+    try:
+        vlan = next(l["vlan"] for l in s["links"] if l["id"] == "sw1-ibmc")
+        row = (s["name"], int(s["ssh"]), s["mgmt"], int(vlan))
+    except (KeyError, TypeError, ValueError, StopIteration):
+        continue
+    if re.fullmatch(r"Node-\d{2,3}", row[0]) and re.fullmatch(r"GE0/0/\d{1,2}", row[2]) \
+            and 1 < row[3] < 4095 and row[3] != 10 and row[2] != "GE0/0/2":
+        print(*row)
+EOF
+)
+
+fail=0
+echo "[1/3] SW1 iBMC ports -> factory VLAN ($(awk '{printf "%s%s %s", (NR>1?", ":""), $1, $3}' <<<"$guests"))"
+commands=(return system-view 'interface GigabitEthernet0/0/2' 'undo port default vlan' 'undo port link-type' quit)
+while read -r name _ port vlan; do
+  [ "$name" = Node-01 ] && continue
+  commands+=("vlan $vlan" quit "interface GigabitEthernet${port#GE}" 'port link-type access' "port default vlan $vlan" quit)
+done <<<"$guests"
+commands+=(quit save '!y' '!enter' '!sleep 3' 'display port vlan')
+sw_out=$(printf '%s\n' "${commands[@]}" | timeout 120 python3 -I "$LAB/vrp_console.py" 2000 2>&1 | tr -d '\r')
+while read -r name _ port vlan; do
+  iface="GigabitEthernet${port#GE}"
+  line=$(grep -E "^$iface " <<<"$sw_out" | tail -1)
+  if [ "$name" = Node-01 ]; then want="^$iface +hybrid +1 "; else want="^$iface +access +$vlan "; fi
+  if grep -qE "$want" <<<"$line"; then
+    echo "      OK  $name $line"
+  else
+    echo "      FAIL $name SW1 port state: ${line:-<no console output, is win7/eNSP running?>}"; fail=1
+  fi
+done <<<"$guests"
+
+echo "[2/3] OS guests: iBMC 192.168.2.100, remove bond, restore sshd_config / SELinux / routes"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+while read -r name ssh _; do
+  timeout 60 ssh -o BatchMode=yes -o ConnectTimeout=8 -p "$ssh" dragon@127.0.0.1 \
+    'sudo /usr/local/sbin/ibmc-sim-reset >/dev/null 2>&1; sudo nmcli con up enp0s3 >/dev/null 2>&1; sleep 2;
+     echo "ibmc=$(sudo ip netns exec ibmc ip -4 -o addr show dev enp0s8 | awk "{print \$4}")";
+     echo "bond=$(nmcli -t -f NAME con show | grep -c "^bond")";
+     echo "selinux=$(getenforce)"; echo "gw=$(ip route show default | awk "{print \$3}" | head -1)"' \
+    >"$tmp/$name" 2>&1 &
+done <<<"$guests"
+wait
+while read -r name _; do
+  os_out=$(grep -E '^(ibmc|bond|selinux|gw)=' "$tmp/$name")
+  echo "      $name: $(tr '\n' ' ' <<<"$os_out")"
+  if grep -q '^ibmc=192.168.2.100/24$' <<<"$os_out" && grep -q '^bond=0$' <<<"$os_out"; then
+    echo "      OK  $name"
+  else
+    echo "      FAIL $name state (is the $name VM running?)"; fail=1
+  fi
+done <<<"$guests"
+
+# Ask the port monitor to re-check factory state now instead of within a minute.
+touch /run/new-api-vm-agent/lab-factory.request 2>/dev/null || true
+echo "[3/3] SW2 business switch: no change needed (each Eth-Trunk returns to Unselect once its bond is gone)"
+if [ "$fail" -eq 0 ]; then echo "RESET_OK"; else echo "RESET_FAIL"; exit 1; fi

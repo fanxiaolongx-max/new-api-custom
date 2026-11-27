@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { CheckCircle2, Loader2, RotateCcw, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -16,18 +16,58 @@ import {
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 
-import { factoryResetLab, type LabResetResult } from '../api'
+import {
+  factoryResetLab,
+  getLabFactoryStatus,
+  type LabResetResult,
+} from '../api'
 
 // A full reset usually takes ~45-55s; SW1 console automation is the first ~35s.
 const EXPECTED_SECONDS = 55
+const FACTORY_KEY = ['system', 'dragon-lab', 'factory-status']
 const SWITCH_PHASE_SECONDS = 35
 
-export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
+export function LabFactoryReset({
+  disabled,
+  nodes = ['Node-01'],
+}: {
+  disabled?: boolean
+  // Every OS guest is reset; each extra node adds a few console commands.
+  nodes?: string[]
+}) {
+  const expectedSeconds = EXPECTED_SECONDS + 8 * (nodes.length - 1)
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [result, setResult] = useState<LabResetResult | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  // The monitor samples about once a minute; polling faster would only re-read the file.
+  const factory = useQuery({
+    queryKey: FACTORY_KEY,
+    queryFn: getLabFactoryStatus,
+    enabled: !disabled,
+    refetchInterval: 60000,
+    retry: false,
+  })
+  const itemLabels = {
+    sw1: t('SW1 iBMC port'),
+    ibmc: t('iBMC address'),
+    bond: t('Bond count'),
+    selinux: 'SELinux',
+  }
+  const differences = (factory.data?.checks ?? [])
+    .filter((check) => check.ok === false)
+    .map(
+      (check) =>
+        `${check.node} ${itemLabels[check.item] ?? check.item}${check.target ? ` ${check.target}` : ''}: ${check.actual} → ${check.expected}`
+    )
+  const factoryState = factory.data?.state
+  let factoryTitle = t('Factory state not checked yet')
+  if (factoryState === 'factory') {
+    factoryTitle = t('Every node is in factory state')
+  } else if (factoryState === 'modified') {
+    factoryTitle = `${t('Differs from factory state')}:\n${differences.join('\n')}`
+  }
   const reset = useMutation({
     mutationFn: factoryResetLab,
     onMutate: () => {
@@ -39,6 +79,11 @@ export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
       if (data.ok) toast.success(t('Lab restored to factory state'))
       else toast.error(t('Factory reset did not complete'))
       void queryClient.invalidateQueries({ queryKey: ['system', 'ibmc'] })
+      // The reset asks the monitor for a fresh check, which lands within ~10s.
+      window.setTimeout(
+        () => void queryClient.invalidateQueries({ queryKey: FACTORY_KEY }),
+        15000
+      )
     },
     onError: (error) => {
       const message = axios.isAxiosError(error)
@@ -61,7 +106,7 @@ export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
   }, [running])
   const percent = result
     ? 100
-    : Math.min(95, Math.round((elapsed / EXPECTED_SECONDS) * 100))
+    : Math.min(95, Math.round((elapsed / expectedSeconds) * 100))
   const phase =
     elapsed < SWITCH_PHASE_SECONDS
       ? t('Restoring SW1 management port...')
@@ -72,6 +117,13 @@ export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
         size='sm'
         variant='outline'
         disabled={disabled}
+        className={
+          factoryState === 'factory' && !running
+            ? 'lab-factory-clean'
+            : undefined
+        }
+        title={disabled ? undefined : factoryTitle}
+        aria-description={disabled ? undefined : factoryTitle}
         onClick={() => {
           if (!running) setResult(null)
           setOpen(true)
@@ -96,9 +148,19 @@ export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
             <AlertDialogDescription render={<div />}>
               <ul className='list-disc space-y-1 ps-5 text-start'>
                 <li>
-                  {t('SW1 GE0/0/2 back to default (hybrid, VLAN 1) and saved')}
+                  {t('Covers {{count}} OS nodes: {{nodes}}', {
+                    count: nodes.length,
+                    nodes: nodes.join(', '),
+                  })}
                 </li>
-                <li>{t('iBMC back to the factory address 192.168.2.100')}</li>
+                <li>
+                  {t(
+                    "SW1 management ports back to each node's factory VLAN and saved"
+                  )}
+                </li>
+                <li>
+                  {t('Every iBMC back to the factory address 192.168.2.100')}
+                </li>
                 <li>
                   {t(
                     'TaiShan OS: bond removed, sshd_config restored, SELinux enforcing'
@@ -106,7 +168,7 @@ export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
                 </li>
                 <li>
                   {t(
-                    'Takes about one minute; win7 and openEuler must be running'
+                    'Takes about one minute; win7 and every OS node must be running'
                   )}
                 </li>
               </ul>
@@ -122,7 +184,7 @@ export function LabFactoryReset({ disabled }: { disabled?: boolean }) {
                 <p className='text-muted-foreground flex justify-between text-xs'>
                   <span>{phase}</span>
                   <span>
-                    {elapsed}s / ~{EXPECTED_SECONDS}s
+                    {elapsed}s / ~{expectedSeconds}s
                   </span>
                 </p>
               )}

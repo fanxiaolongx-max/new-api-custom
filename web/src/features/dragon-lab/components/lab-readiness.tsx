@@ -5,6 +5,8 @@ import {
   CircleDashed,
   FileCode2,
   LoaderCircle,
+  Server,
+  X,
 } from 'lucide-react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -50,6 +52,15 @@ export function LabReadiness(props: {
   pendingAction?: WorkbenchAction | null
   pending?: boolean
   actionError?: boolean | 'rejected' | 'timeout' | null
+  // Enabled workbench hosts the six actions run against; undefined when unknown.
+  scope?: string[]
+  // Provisioned guests the workbench does not list yet.
+  newHosts?: string[]
+  onImport?: (name: string) => void
+  onDismiss?: (name: string) => void
+  // Workbench hosts that belong to provisioned guests and may be removed in one click.
+  removable?: string[]
+  onRemove?: (name: string) => void
 }) {
   const { t } = useTranslation()
   const feedbackID = useId()
@@ -144,11 +155,58 @@ export function LabReadiness(props: {
         {t('Open script workbench')}
         <ArrowUpRight size={13} />
       </Button>
+      {props.authorized &&
+        props.newHosts?.map((name) => (
+          <div key={name} className='lab-import-prompt' role='status'>
+            <Server size={14} aria-hidden />
+            <p>{t('{{name}} is ready. Add it to the workbench?', { name })}</p>
+            <Button size='xs' onClick={() => props.onImport?.(name)}>
+              {t('Add to lab')}
+            </Button>
+            <Button
+              size='xs'
+              variant='ghost'
+              onClick={() => props.onDismiss?.(name)}
+            >
+              {t('Later')}
+            </Button>
+          </div>
+        ))}
       {props.workbench && (
         <section
           className='lab-quick-controls'
           aria-label={t('Workbench quick actions')}
         >
+          {props.scope && (
+            <p className='lab-action-scope'>
+              {props.scope.length > 0 ? (
+                <>
+                  {t('Applies to:')}
+                  {props.scope.map((host) => (
+                    <span key={host} className='lab-scope-host'>
+                      {host}
+                      {props.removable?.includes(host) && (
+                        <button
+                          type='button'
+                          aria-label={t('Remove {{name}} from the workbench', {
+                            name: host,
+                          })}
+                          title={t('Remove {{name}} from the workbench', {
+                            name: host,
+                          })}
+                          onClick={() => props.onRemove?.(host)}
+                        >
+                          <X size={10} aria-hidden />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </>
+              ) : (
+                t('No hosts are enabled in the workbench')
+              )}
+            </p>
+          )}
           <div className='lab-action-grid'>
             {WORKBENCH_ACTIONS.map((action) => {
               return (

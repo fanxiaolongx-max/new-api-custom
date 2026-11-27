@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import {
   getLabTool,
   LAB_KEY,
+  labHostFields,
   saveLabConfig,
   type LabConfig,
   type LabOSInstance,
@@ -16,6 +17,9 @@ import {
 
 export default function LabTool(props: {
   instances?: LabOSInstance[]
+  onImport?: (instance: LabOSInstance) => void
+  removable?: string[]
+  onRemove?: (hostname: string) => void
   config: LabConfig
   onClose: () => void
   onDetach?: () => void
@@ -133,38 +137,43 @@ export default function LabTool(props: {
             key={instance.name}
             size='sm'
             variant='outline'
-            disabled={props.running}
+            disabled={props.running || !labHostFields(instance)}
             onClick={() => {
-              const os = instance.nodes.find((n) => n.id === 'os')
-              const mgmt = instance.links.find((link) => link.id === 'sw1-ibmc')
-              const ibmc = instance.nodes.find((n) => n.id === 'ibmc')
-              if (!os || !mgmt || !ibmc) return
-              const [ip, prefix] = os.address.split('/')
-              const frame = (
-                remoteURL ? (props.frame ?? localFrame) : localFrame
-              ).current
-              frame?.contentWindow?.postMessage(
+              if (props.onImport) {
+                props.onImport(instance)
+                return
+              }
+              // The bundled copy has no bridge hook; greet it on a fresh channel first.
+              const fields = labHostFields(instance)
+              const target = localFrame.current?.contentWindow
+              if (!fields || !target) return
+              const channel = crypto.randomUUID()
+              const message = { source: 'dragon-lab', version: 1, channel }
+              target.postMessage({ ...message, type: 'hello' }, '*')
+              target.postMessage(
                 {
-                  source: 'dragon-lab',
-                  version: 1,
+                  ...message,
                   type: 'prefill-host',
-                  channel: crypto.randomUUID(),
-                  fields: {
-                    ehHostname: instance.name,
-                    ehMgmtPort: mgmt.source_port,
-                    ehOsIp: ip,
-                    ehPrefix: prefix,
-                    ehOsGw: os.gateway,
-                    ehIbmcIp: ibmc.address.split('→').at(-1)?.trim(),
-                  },
+                  id: crypto.randomUUID(),
+                  fields,
                 },
-                remoteURL && remoteSandbox.includes('allow-same-origin')
-                  ? new URL(remoteURL).origin
-                  : '*'
+                '*'
               )
             }}
           >
             {t('Add')} {instance.name}
+          </Button>
+        ))}
+        {props.removable?.map((hostname) => (
+          <Button
+            key={hostname}
+            size='sm'
+            variant='outline'
+            disabled={props.running}
+            onClick={() => props.onRemove?.(hostname)}
+          >
+            <X size={14} />
+            {t('Remove {{name}}', { name: hostname })}
           </Button>
         ))}
         {!remoteURL && (

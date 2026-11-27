@@ -98,3 +98,50 @@ export async function getLabOSNodes(): Promise<LabOSInstance[]> {
   )
   return response.data.data
 }
+
+export type LabHostFields = Record<
+  'ehHostname' | 'ehMgmtPort' | 'ehIbmcIp' | 'ehOsIp' | 'ehPrefix' | 'ehOsGw',
+  string
+>
+
+// The workbench's "add host" dialog fields for a provisioned guest; null when
+// the inventory row lacks an address the dialog requires.
+export function labHostFields(instance: LabOSInstance): LabHostFields | null {
+  const os = instance.nodes.find((node) => node.id === 'os')
+  const ibmc = instance.nodes.find((node) => node.id === 'ibmc')
+  const mgmt = instance.links.find((link) => link.id === 'sw1-ibmc')
+  const [ip, prefix] = os?.address.split('/') ?? []
+  const fields = {
+    ehHostname: instance.name,
+    ehMgmtPort: mgmt?.source_port ?? '',
+    ehIbmcIp: ibmc?.address.split('→').at(-1)?.trim() ?? '',
+    ehOsIp: ip ?? '',
+    ehPrefix: prefix ?? '',
+    ehOsGw: os?.gateway ?? '',
+  }
+  return Object.values(fields).every((value) => value.length > 0)
+    ? fields
+    : null
+}
+
+export interface LabFactoryCheck {
+  node: string
+  item: 'sw1' | 'ibmc' | 'bond' | 'selinux'
+  target?: string
+  expected: string
+  actual: string | null
+  ok: boolean | null
+}
+export interface LabFactoryStatus {
+  updated: number
+  state: 'factory' | 'modified' | 'unknown'
+  checks: LabFactoryCheck[]
+}
+
+export async function getLabFactoryStatus(): Promise<LabFactoryStatus> {
+  const response = await api.get<{ data: LabFactoryStatus }>(
+    '/api/system/lab/factory-status',
+    { skipErrorHandler: true }
+  )
+  return response.data.data
+}

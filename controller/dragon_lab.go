@@ -135,3 +135,12 @@ func GetDragonLabOSNodes(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"success": true, "data": nodes})
 }
+
+func GetDragonLabFactoryStatus(c *gin.Context) {
+	status, err := service.GetDragonLabFactoryStatus()
+	if err != nil {
+		c.JSON(503, gin.H{"success": false, "message": "Factory status unavailable"})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "data": status})
+}

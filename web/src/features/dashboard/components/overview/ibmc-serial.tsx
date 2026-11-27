@@ -9,7 +9,12 @@ import { readIBMCSerial, serialIBMC } from '@/features/dashboard/ibmc-api'
 
 // COM1 is a fixed 80x24 serial terminal. Linux TTY has no SSH-style resize channel.
 export default function IBMCSerial(
-  props: { autoConnect?: boolean; compact?: boolean; autoLogin?: boolean } = {}
+  props: {
+    autoConnect?: boolean
+    compact?: boolean
+    autoLogin?: boolean
+    node?: string
+  } = {}
 ) {
   const { t } = useTranslation()
   const container = useRef<HTMLDivElement>(null)
@@ -25,6 +30,9 @@ export default function IBMCSerial(
     let disposed = false
     let failed = false
     let session = ''
+    // Node-01 requests stay unchanged; other guests name their COM1 explicitly.
+    const target = props.node ? { node: props.node } : {}
+    const nodeArg = props.node ? [props.node] : []
     let cursor = 0
     let timer: ReturnType<typeof setTimeout> | undefined
     let inputTimer: ReturnType<typeof setTimeout> | undefined
@@ -63,9 +71,11 @@ export default function IBMCSerial(
       setConnected(false)
       setConnecting(false)
       if (session) {
-        closing.current = serialIBMC({ operation: 'close', session }).catch(
-          () => {}
-        )
+        closing.current = serialIBMC({
+          ...target,
+          operation: 'close',
+          session,
+        }).catch(() => {})
       }
     }
     const onInput = terminal.onData((value) => {
@@ -86,7 +96,12 @@ export default function IBMCSerial(
               const data = btoa(
                 String.fromCharCode(...bytes.subarray(offset, offset + 4096))
               )
-              await serialIBMC({ operation: 'write', session, data })
+              await serialIBMC({
+                ...target,
+                operation: 'write',
+                session,
+                data,
+              })
             }
           })
           .catch(fail)
@@ -95,7 +110,7 @@ export default function IBMCSerial(
     async function poll() {
       if (disposed || failed) return
       try {
-        const result = await readIBMCSerial(session, cursor)
+        const result = await readIBMCSerial(session, cursor, ...nodeArg)
         if (disposed || failed) return
         cursor = result.cursor
         if (result.truncated) terminal.write('\r\n[…]\r\n')
@@ -111,6 +126,7 @@ export default function IBMCSerial(
     }
     const opening = closing.current.then(() =>
       serialIBMC({
+        ...target,
         operation: 'open',
         ...(props.autoLogin ? { auto_login: true } : {}),
       })
@@ -120,7 +136,11 @@ export default function IBMCSerial(
         session = result.session
         cursor = result.cursor
         if (disposed) {
-          await serialIBMC({ operation: 'close', session })
+          await serialIBMC({
+            ...target,
+            operation: 'close',
+            session,
+          })
           return
         }
         setConnecting(false)
@@ -141,11 +161,15 @@ export default function IBMCSerial(
       terminal.dispose()
       closing.current = opening
         .then((result) =>
-          serialIBMC({ operation: 'close', session: result.session })
+          serialIBMC({
+            ...target,
+            operation: 'close',
+            session: result.session,
+          })
         )
         .catch(() => {})
     }
-  }, [attempt, props.compact, props.autoLogin])
+  }, [attempt, props.compact, props.autoLogin, props.node])
   let connectionLabel = t('Connect serial console')
   if (connecting) connectionLabel = t('Connecting...')
   else if (connected) connectionLabel = t('Disconnect')

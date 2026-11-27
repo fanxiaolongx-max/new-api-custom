@@ -7,6 +7,7 @@ export function LabExecution(props: {
   terminal?: ExecutionTerminal
   connected: boolean
   available: boolean
+  target?: string
 }) {
   const { t } = useTranslation()
   const view = useRef<HTMLPreElement>(null)
@@ -27,7 +28,14 @@ export function LabExecution(props: {
     <div className='lab-execution'>
       <div className='lab-execution-status'>
         {t('Read-only execution feed')}
-        <span>{status}</span>
+        <span>
+          {props.target && (
+            <em className='lab-execution-target'>
+              {t('Target: {{host}}', { host: props.target })}
+            </em>
+          )}
+          {status}
+        </span>
       </div>
       <pre
         ref={view}
