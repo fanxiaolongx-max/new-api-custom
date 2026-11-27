@@ -114,11 +114,13 @@ func TestGlobalAPIRateLimiterExcludesInternalSSOAuthChecks(t *testing.T) {
 	apiRouter := router.Group("/api")
 	apiRouter.Use(GlobalAPIRateLimit())
 	apiRouter.GET("/logs/auth", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	apiRouter.GET("/system/lab/console/auth", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	apiRouter.GET("/status", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 
 	remoteAddr := "192.0.2.25:12345"
 	for range 3 {
 		assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/api/logs/auth", remoteAddr).Code)
+		assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/api/system/lab/console/auth", remoteAddr).Code)
 	}
 	assert.False(t, redisServer.Exists(redisIPRateLimitKey("GA", "192.0.2.25")))
 
