@@ -12,6 +12,22 @@ from unittest import mock
 import vm_agent
 
 
+class WorkspaceInventoryTest(unittest.TestCase):
+    def test_only_registered_lab_slots_join_workspace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            slots = Path(directory) / "slots.json"
+            with (
+                mock.patch.object(vm_agent, "LAB_SLOTS_PATH", slots),
+                mock.patch.object(vm_agent, "ALLOWED_VMS", ("openEuler",)),
+                mock.patch.object(vm_agent, "run_vbox", return_value=(
+                    '"DragonLab-Node-02" {id2}\n"private" {id3}\n'
+                )),
+            ):
+                self.assertEqual(vm_agent.managed_vm_names(), ("openEuler",))
+                slots.write_text('[{"vm":"DragonLab-Node-02"},{"vm":"DragonLab-Node-03"},{"vm":"private"}]')
+                self.assertEqual(vm_agent.managed_vm_names(), ("openEuler", "DragonLab-Node-02"))
+
+
 class VirtualMachineLifecycleTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()

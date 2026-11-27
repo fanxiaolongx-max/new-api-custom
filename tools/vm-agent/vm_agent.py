@@ -11,6 +11,7 @@ import json
 
 from ibmc import IBMC
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -96,6 +97,31 @@ def run_vbox(*args: str, timeout: int = 20) -> str:
         message = completed.stderr.strip() or completed.stdout.strip()
         raise RuntimeError(message or "VirtualBox command failed")
     return completed.stdout
+
+
+LAB_SLOTS_PATH = Path("/var/lib/new-api-vm-agent/lab-os-slots.json")
+
+
+def managed_vm_names() -> tuple[str, ...]:
+    """Include provisioned lab slots while keeping unmapped host VMs private."""
+    try:
+        slots = json.loads(LAB_SLOTS_PATH.read_text())
+    except (OSError, ValueError):
+        return ALLOWED_VMS
+    if not isinstance(slots, list):
+        return ALLOWED_VMS
+    candidates = [
+        slot["vm"] for slot in slots
+        if isinstance(slot, dict) and isinstance(slot.get("vm"), str)
+        and re.fullmatch(r"DragonLab-Node-[0-9]+", slot["vm"])
+    ]
+    if not candidates:
+        return ALLOWED_VMS
+    registered = {
+        line.rpartition('" {')[0].removeprefix('"')
+        for line in run_vbox("list", "vms").splitlines()
+    }
+    return tuple(dict.fromkeys((*ALLOWED_VMS, *(vm for vm in candidates if vm in registered))))
 
 
 def machine_readable_values(name: str) -> dict[str, str]:
@@ -381,7 +407,7 @@ class Handler(BaseHTTPRequestHandler):
         if len(parts) < 3 or parts[:2] != ["v1", "vms"]:
             return None, None
         name = parts[2]
-        if name not in ALLOWED_VMS:
+        if name not in ALLOWED_VMS and name not in managed_vm_names():
             return None, None
         suffix = "/".join(parts[3:])
         return name, suffix
@@ -402,7 +428,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             if urlparse(self.path).path == "/v1/vms":
-                self.send_json(200, {"vms": [machine_info(name) for name in ALLOWED_VMS]})
+                self.send_json(200, {"vms": [machine_info(name) for name in managed_vm_names()]})
                 return
 
             name, suffix = self.route()
