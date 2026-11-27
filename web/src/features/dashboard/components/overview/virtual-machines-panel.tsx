@@ -60,6 +60,7 @@ import {
   type VirtualMachine,
   type VirtualMachineAction,
 } from '@/features/dashboard/api'
+import { labConsoleURL } from '@/features/dragon-lab/api'
 import { cn } from '@/lib/utils'
 
 import { KindleScreen } from './kindle-screen'
@@ -82,6 +83,10 @@ const WEB_CONSOLE_PATHS: Readonly<Record<string, string>> = {
   root: '/guacamole/#/client/MTMAYwBwb3N0Z3Jlc3Fs',
   openEuler: '/guacamole/#/client/NgBjAHBvc3RncmVzcWw',
 }
+const SWITCH_CONSOLES = [
+  { name: 'S5700-LSW1', id: 7 },
+  { name: 'S5700-LSW2', id: 8 },
+]
 const ACTIVE_VM_STATES = new Set([
   'running',
   'paused',
@@ -107,6 +112,7 @@ function stateLabelKey(state: string): string {
 
 function MachineRow(props: {
   machine: VirtualMachine
+  consoleID?: number
   companionLocked: boolean
   pendingAction?: VirtualMachineAction
   actionsDisabled: boolean
@@ -122,7 +128,9 @@ function MachineRow(props: {
     props.machine.state === 'saved'
       ? t('Restoring saved state…')
       : t('Starting virtual machine…')
-  const webConsolePath = WEB_CONSOLE_PATHS[props.machine.name]
+  const webConsolePath = props.consoleID
+    ? labConsoleURL(props.consoleID)
+    : WEB_CONSOLE_PATHS[props.machine.name]
   const canStart =
     starting ||
     (['powered_off', 'saved', 'aborted'].includes(props.machine.state) &&
@@ -321,8 +329,8 @@ export function VirtualMachinesPanel() {
   >(null)
 
   const machinesQuery = useQuery({
-    queryKey: VM_QUERY_KEY,
-    queryFn: async () => (await getVirtualMachines()).data,
+    queryKey: [...VM_QUERY_KEY, 'workspace'],
+    queryFn: getVirtualMachines,
     refetchInterval: 5000,
     retry: 1,
   })
@@ -354,7 +362,7 @@ export function VirtualMachinesPanel() {
     actionMutation.mutate({ name, action })
   }
   const win11IsActive = Boolean(
-    machinesQuery.data?.some(
+    machinesQuery.data?.data.some(
       (machine) =>
         machine.name === 'win11' && ACTIVE_VM_STATES.has(machine.state)
     )
@@ -431,10 +439,11 @@ export function VirtualMachinesPanel() {
             minutes={settingsQuery.data.idle_save_minutes}
           />
         )}
-        {machinesQuery.data?.map((machine) => (
+        {machinesQuery.data?.data.map((machine) => (
           <MachineRow
             key={machine.name}
             machine={machine}
+            consoleID={machinesQuery.data?.consoles?.vm_consoles[machine.name]}
             companionLocked={machine.name === 'feiniu' && win11IsActive}
             pendingAction={
               actionMutation.isPending &&
@@ -452,7 +461,7 @@ export function VirtualMachinesPanel() {
             onForcePowerOff={() => setForcePowerOffMachine(machine.name)}
           />
         ))}
-        {machinesQuery.isSuccess && machinesQuery.data.length === 0 && (
+        {machinesQuery.isSuccess && machinesQuery.data.data.length === 0 && (
           <p className='text-muted-foreground text-sm'>
             {t('No managed virtual machines were found.')}
           </p>
@@ -546,39 +555,46 @@ export function VirtualMachinesPanel() {
             </Button>
           </div>
         </article>
-        <article className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'>
-          <div className='flex min-w-0 items-center gap-3'>
-            <Terminal
-              className='text-muted-foreground size-4 shrink-0'
-              aria-hidden='true'
-            />
-            <div className='min-w-0'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <h4 className='font-medium'>S5700-LSW1</h4>
-                <Badge variant='secondary'>{t('Telnet console')}</Badge>
+        {(machinesQuery.data?.consoles?.switches ?? SWITCH_CONSOLES).map(
+          ({ name, id }) => (
+            <article
+              key={id}
+              className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'
+            >
+              <div className='flex min-w-0 items-center gap-3'>
+                <Terminal
+                  className='text-muted-foreground size-4 shrink-0'
+                  aria-hidden='true'
+                />
+                <div className='min-w-0'>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <h4 className='font-medium'>{name}</h4>
+                    <Badge variant='secondary'>{t('Telnet console')}</Badge>
+                  </div>
+                  <p className='text-muted-foreground mt-0.5 text-xs'>
+                    {t(
+                      'Huawei eNSP switch in win7. Start win7 and the device in eNSP first.'
+                    )}
+                  </p>
+                </div>
               </div>
-              <p className='text-muted-foreground mt-0.5 text-xs'>
-                {t(
-                  'Huawei eNSP switch in win7. Start win7 and the device in eNSP first.'
-                )}
-              </p>
-            </div>
-          </div>
-          <Button
-            size='sm'
-            render={
-              <a
-                href='/guacamole/#/client/NwBjAHBvc3RncmVzcWw'
-                target='_blank'
-                rel='noreferrer'
-              />
-            }
-            nativeButton={false}
-          >
-            <Terminal data-icon='inline-start' />
-            {t('Open terminal')}
-          </Button>
-        </article>
+              <Button
+                size='sm'
+                render={
+                  <a
+                    href={labConsoleURL(id)}
+                    target='_blank'
+                    rel='noreferrer'
+                  />
+                }
+                nativeButton={false}
+              >
+                <Terminal data-icon='inline-start' />
+                {t('Open terminal')}
+              </Button>
+            </article>
+          )
+        )}
       </div>
 
       {ibmcOpen && (

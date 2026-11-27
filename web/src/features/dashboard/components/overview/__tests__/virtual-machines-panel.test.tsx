@@ -97,6 +97,55 @@ describe('virtual machine management', () => {
     )
     queryClient.clear()
   })
+  test('opens the matching Telnet console for each eNSP switch', async () => {
+    const queryClient = renderPanel()
+    for (const [name, client] of [
+      ['S5700-LSW1', 'NwBjAHBvc3RncmVzcWw'],
+      ['S5700-LSW2', 'OABjAHBvc3RncmVzcWw'],
+    ]) {
+      const row = (await screen.findByRole('heading', { name })).closest(
+        'article'
+      )
+      if (!row) throw new Error('Missing switch row')
+      expect(
+        within(row).getByRole('button', { name: 'Open terminal' })
+      ).toHaveAttribute('href', `/guacamole/#/client/${client}`)
+    }
+    queryClient.clear()
+  })
+
+  test('discovers a registered switch and opens the console bound to a lab guest', async () => {
+    getVirtualMachines.mockResolvedValue({
+      data: [
+        {
+          name: 'DragonLab-Node-03',
+          state: 'running',
+          cpu_count: 2,
+          memory_mb: 896,
+          os_type: 'Linux',
+        },
+      ],
+      consoles: {
+        switches: [{ name: 'S5700-LSW3', id: 14 }],
+        vm_consoles: { 'DragonLab-Node-03': 15 },
+      },
+    })
+    const queryClient = renderPanel()
+    const sw = (await screen.findByText('S5700-LSW3')).closest('article')
+    const vm = screen.getByText('DragonLab-Node-03').closest('article')
+    if (!sw || !vm) throw new Error('Missing discovered device row')
+    expect(within(sw).getByText('Open terminal').closest('a')).toHaveAttribute(
+      'href',
+      '/guacamole/#/client/MTQAYwBwb3N0Z3Jlc3Fs'
+    )
+    expect(within(vm).getByText('Remote control').closest('a')).toHaveAttribute(
+      'href',
+      '/guacamole/#/client/MTUAYwBwb3N0Z3Jlc3Fs'
+    )
+    expect(screen.queryByText('S5700-LSW1')).not.toBeInTheDocument()
+    queryClient.clear()
+  })
+
   test('offers mafuli a separate system terminal without virtual machine power controls', async () => {
     const queryClient = renderPanel()
     const selector = await screen.findByRole('combobox', { name: 'Username' })

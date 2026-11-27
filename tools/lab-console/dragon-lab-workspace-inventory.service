@@ -1,0 +1,6 @@
+[Unit]
+Description=Refresh Dragon Lab workspace console bindings
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I %h/.local/bin/dragon-lab-workspace-inventory.py

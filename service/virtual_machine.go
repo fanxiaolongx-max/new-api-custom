@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,6 +46,29 @@ type VirtualMachine struct {
 	OSType   string `json:"os_type"`
 	MemoryMB int    `json:"memory_mb"`
 	CPUCount int    `json:"cpu_count"`
+}
+
+type WorkspaceSwitch struct {
+	Name string `json:"name"`
+	ID   int    `json:"id"`
+}
+
+type WorkspaceConsoles struct {
+	Switches   []WorkspaceSwitch `json:"switches"`
+	VMConsoles map[string]int    `json:"vm_consoles"`
+}
+
+func ReadWorkspaceConsoles() *WorkspaceConsoles {
+	f, err := os.Open(filepath.Join(filepath.Dir(dragonLabResetSocket()), "workspace-consoles.json"))
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	var consoles WorkspaceConsoles
+	if common.DecodeJson(io.LimitReader(f, 1<<20), &consoles) != nil {
+		return nil
+	}
+	return &consoles
 }
 
 type vmListResponse struct {

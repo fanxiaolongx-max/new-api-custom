@@ -1,0 +1,10 @@
+[Unit]
+Description=Discover Dragon Lab workspace consoles
+
+[Timer]
+OnStartupSec=2
+OnUnitInactiveSec=15
+AccuracySec=1
+
+[Install]
+WantedBy=timers.target

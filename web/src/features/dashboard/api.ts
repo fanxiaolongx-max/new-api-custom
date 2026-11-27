@@ -253,6 +253,10 @@ export type VirtualMachineAction = 'start' | 'shutdown' | 'save' | 'poweroff'
 export async function getVirtualMachines() {
   const res = await api.get<{
     success: boolean
+    consoles?: {
+      switches: { name: string; id: number }[]
+      vm_consoles: Record<string, number>
+    } | null
     data: VirtualMachine[]
     message?: string
   }>('/api/system/virtual-machines', { skipErrorHandler: true })

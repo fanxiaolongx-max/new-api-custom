@@ -65,7 +65,7 @@ func ListVirtualMachines(c *gin.Context) {
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": machines})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": machines, "consoles": service.ReadWorkspaceConsoles()})
 }
 
 func GetVirtualMachineSettings(c *gin.Context) {
