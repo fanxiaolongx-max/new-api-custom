@@ -1388,3 +1388,35 @@
 .lab-execution-tabs > [role='tablist'] [role='tab']::after {
   background: #40b9ce;
 }
+.lab-port-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--background);
+  z-index: 3;
+  cursor: help;
+  background: var(--muted-foreground);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.lab-port-dot.is-up {
+  background: #22c55e;
+}
+.lab-port-dot.is-down {
+  background: #ef4444;
+  animation: lab-port-down 1.6s ease-in-out infinite;
+}
+.lab-port-dot.is-warn {
+  background: #f59e0b;
+}
+@keyframes lab-port-down {
+  50% {
+    box-shadow: 0 0 0 4px rgb(239 68 68 / 0.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lab-port-dot.is-down {
+    animation: none;
+  }
+}

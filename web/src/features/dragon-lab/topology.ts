@@ -54,11 +54,17 @@ export const LAB_LINKS: {
   title: string
   kind: 'management' | 'business' | 'sol'
   path: string
+  /** Wire endpoints (source, target) in the 1440×740 canvas, where port status dots sit. */
+  ends: [[number, number], [number, number]]
   x: number
   y: number
 }[] = [
   {
     id: 'pc-sw1',
+    ends: [
+      [400, 100],
+      [520, 100],
+    ],
     title: 'Management access',
     kind: 'management',
     path: 'M400 100 H520',
@@ -67,6 +73,10 @@ export const LAB_LINKS: {
   },
   {
     id: 'sw1-ibmc',
+    ends: [
+      [920, 100],
+      [1040, 100],
+    ],
     title: 'Access VLAN',
     kind: 'management',
     path: 'M920 100 H1040',
@@ -75,6 +85,10 @@ export const LAB_LINKS: {
   },
   {
     id: 'pc-sw2',
+    ends: [
+      [400, 250],
+      [520, 490],
+    ],
     title: 'Installation network',
     kind: 'business',
     path: 'M400 250 H460 V490 H520',
@@ -83,6 +97,10 @@ export const LAB_LINKS: {
   },
   {
     id: 'sw2-os-a',
+    ends: [
+      [920, 490],
+      [1040, 490],
+    ],
     title: 'LACP member A',
     kind: 'business',
     path: 'M920 490 H1040',
@@ -91,6 +109,10 @@ export const LAB_LINKS: {
   },
   {
     id: 'sw2-os-b',
+    ends: [
+      [920, 565],
+      [1040, 565],
+    ],
     title: 'LACP member B',
     kind: 'business',
     path: 'M920 565 H1040',
@@ -99,6 +121,10 @@ export const LAB_LINKS: {
   },
   {
     id: 'ibmc-os',
+    ends: [
+      [1240, 310],
+      [1240, 430],
+    ],
     title: 'Serial over LAN',
     kind: 'sol',
     path: 'M1240 310 V430',

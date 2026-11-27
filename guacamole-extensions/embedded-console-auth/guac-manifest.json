@@ -1,0 +1,6 @@
+{
+  "guacamoleVersion": "1.6.0",
+  "name": "Isolate embedded console authentication",
+  "namespace": "embedded-console-auth",
+  "js": ["embedded-console-auth.js"]
+}

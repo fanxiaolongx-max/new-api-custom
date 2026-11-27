@@ -22,7 +22,13 @@ import { hasPermission } from '@/lib/admin-permissions'
 import { canAccessDragonLab } from '@/lib/dragon-lab-access'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { getLabConfig, LAB_KEY, type LabLinkID, type LabNodeID } from './api'
+import {
+  getLabConfig,
+  getLabLinkStatus,
+  LAB_KEY,
+  type LabLinkID,
+  type LabNodeID,
+} from './api'
 import { LabFactoryReset } from './components/lab-factory-reset'
 import { LabInfo } from './components/lab-info'
 import { LabNode } from './components/lab-node'
@@ -67,6 +73,13 @@ export function DragonLab() {
     queryFn: async () => (await getVirtualMachines()).data,
     enabled: authorized,
     refetchInterval: 15000,
+    retry: false,
+  })
+  const linkStatus = useQuery({
+    queryKey: ['system', 'dragon-lab', 'link-status'],
+    queryFn: getLabLinkStatus,
+    enabled: authorized,
+    refetchInterval: 10000,
     retry: false,
   })
   const ibmc = useQuery({
@@ -323,6 +336,7 @@ export function DragonLab() {
                 <div className='lab-canvas'>
                   <LabWiring
                     config={authorized ? config.data : undefined}
+                    status={authorized ? linkStatus.data : undefined}
                     authorized={authorized}
                     onSelect={(id) => {
                       if (authorized) setSelected(id)

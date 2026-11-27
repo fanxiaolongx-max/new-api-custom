@@ -181,6 +181,7 @@ services:
     expose:
       - "8080"
     volumes:
+      - ./guacamole-extensions/embedded-console-auth.jar:/etc/guacamole/extensions/embedded-console-auth.jar:ro
       - ./guacamole-extensions/no-browser-side-navigation.jar:/etc/guacamole/extensions/no-browser-side-navigation.jar:ro
     environment:
       - GUACD_HOSTNAME=guacd

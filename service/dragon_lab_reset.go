@@ -28,18 +28,21 @@ func dragonLabResetSocket() string {
 	return filepath.Join(filepath.Dir(agentSocket), "lab-reset.sock")
 }
 
-func ResetDragonLab() (DragonLabResetResult, error) {
+func dragonLabHelperClient(timeout time.Duration) *http.Client {
 	socketPath := dragonLabResetSocket()
-	client := &http.Client{
+	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				return (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "unix", socketPath)
 			},
 		},
-		// Console automation on SW1 plus the OS reset takes about a minute.
-		Timeout: 3 * time.Minute,
+		Timeout: timeout,
 	}
-	response, err := client.Post("http://lab-reset/v1/lab/factory-reset", "application/json", nil)
+}
+
+func ResetDragonLab() (DragonLabResetResult, error) {
+	// Console automation on SW1 plus the OS reset takes about a minute.
+	response, err := dragonLabHelperClient(3*time.Minute).Post("http://lab-reset/v1/lab/factory-reset", "application/json", nil)
 	if err != nil {
 		return DragonLabResetResult{}, fmt.Errorf("%w: %v", ErrVMAgentUnavailable, err)
 	}
@@ -52,4 +55,35 @@ func ResetDragonLab() (DragonLabResetResult, error) {
 		return result, &VMAgentResponseError{Status: http.StatusConflict, Message: result.Log}
 	}
 	return result, nil
+}
+
+// DragonLabEndpointStatus is the live state of one end of a topology link.
+type DragonLabEndpointStatus struct {
+	State  string `json:"state"` // up | down | warn | unknown
+	Label  string `json:"label"`
+	Detail string `json:"detail"`
+}
+
+// DragonLabLinkStatus is collected every 10s inside the lab and relayed by the reset helper.
+type DragonLabLinkStatus struct {
+	Updated   int64                              `json:"updated"`
+	Stale     bool                               `json:"stale"`
+	Endpoints map[string]DragonLabEndpointStatus `json:"endpoints"`
+	Links     map[string][2]string               `json:"links"`
+}
+
+func GetDragonLabLinkStatus() (DragonLabLinkStatus, error) {
+	response, err := dragonLabHelperClient(12 * time.Second).Get("http://lab-reset/v1/lab/link-status")
+	if err != nil {
+		return DragonLabLinkStatus{}, fmt.Errorf("%w: %v", ErrVMAgentUnavailable, err)
+	}
+	defer response.Body.Close()
+	var status DragonLabLinkStatus
+	if response.StatusCode != http.StatusOK {
+		return status, fmt.Errorf("lab link status helper returned status %d", response.StatusCode)
+	}
+	if err := common.DecodeJson(response.Body, &status); err != nil {
+		return status, fmt.Errorf("lab link status helper returned invalid data: %w", err)
+	}
+	return status, nil
 }

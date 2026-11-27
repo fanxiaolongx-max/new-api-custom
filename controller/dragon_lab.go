@@ -55,6 +55,14 @@ func ResetDragonLab(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"success": true, "data": result})
 }
+func GetDragonLabLinkStatus(c *gin.Context) {
+	status, err := service.GetDragonLabLinkStatus()
+	if err != nil {
+		c.JSON(503, gin.H{"success": false, "message": "Lab link status is unavailable"})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "data": status})
+}
 func GetDragonLabTool(c *gin.Context) {
 	// Served as authenticated text; the frontend isolates it in a sandboxed frame.
 	c.Header("X-Content-Type-Options", "nosniff")

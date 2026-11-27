@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next'
 
-import type { LabConfig, LabLinkID } from '../api'
+import type { LabConfig, LabLinkID, LabLinkStatus } from '../api'
 import { LAB_LINKS } from '../topology'
 
 export function LabWiring(props: {
   config?: LabConfig
+  status?: LabLinkStatus
   authorized: boolean
   onSelect: (id: LabLinkID) => void
 }) {
@@ -62,6 +63,38 @@ export function LabWiring(props: {
           </button>
         )
       })}
+      {props.authorized &&
+        props.status &&
+        LAB_LINKS.flatMap((link) =>
+          (props.status?.links[link.id] ?? []).map((endpointID, index) => {
+            const endpoint = props.status?.endpoints[endpointID]
+            const state = props.status?.stale
+              ? 'unknown'
+              : (endpoint?.state ?? 'unknown')
+            const [x, y] = link.ends[index]
+            const label = endpoint?.label ?? endpointID
+            const detail = props.status?.stale
+              ? t('Port status is out of date')
+              : (endpoint?.detail ?? t('No data'))
+            return (
+              <span
+                key={`${link.id}-${endpointID}`}
+                className={`lab-port-dot is-${state}`}
+                style={{ left: `${x / 14.4}%`, top: `${y / 7.4}%` }}
+                title={`${label} · ${t(PORT_STATE_KEYS[state])}\n${detail}`}
+                role='img'
+                aria-label={`${label}: ${t(PORT_STATE_KEYS[state])}`}
+              />
+            )
+          })
+        )}
     </>
   )
+}
+
+const PORT_STATE_KEYS: Record<string, string> = {
+  up: 'Port up',
+  down: 'Port down',
+  warn: 'Port degraded',
+  unknown: 'Port status unknown',
 }

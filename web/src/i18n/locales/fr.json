@@ -6120,6 +6120,11 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Port up": "Port actif",
+    "Port down": "Port inactif",
+    "Port degraded": "Port dégradé",
+    "Port status unknown": "État du port inconnu",
+    "Port status is out of date": "L'état du port n'est plus à jour"
   }
 }

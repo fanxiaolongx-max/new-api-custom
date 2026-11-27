@@ -6120,6 +6120,11 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Port up": "端口 up",
+    "Port down": "端口 down",
+    "Port degraded": "端口异常（未加入聚合）",
+    "Port status unknown": "端口状态未知",
+    "Port status is out of date": "端口状态已过期"
   }
 }

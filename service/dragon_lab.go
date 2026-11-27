@@ -50,9 +50,9 @@ func DefaultDragonLabConfig() DragonLabConfig {
 		Links: []DragonLabLink{
 			{ID: "pc-sw1", SourcePort: "Loopback / Cloud", TargetPort: "GE0/0/1", SourceAddress: "192.168.56.10/24", TargetAddress: "192.168.56.254/24", VLAN: "10", Phase: "planned"},
 			{ID: "sw1-ibmc", SourcePort: "GE0/0/2", TargetPort: "iBMC management", SourceAddress: "VLAN 10 · Access", TargetAddress: "8.35.155.29/24", VLAN: "10", Phase: "planned"},
-			{ID: "pc-sw2", SourcePort: "Installation NIC", TargetPort: "GE0/0/1", SourceAddress: "62.2.90.164", TargetAddress: "62.2.90.x", Phase: "planned"},
-			{ID: "sw2-os-a", SourcePort: "GE0/0/2", TargetPort: "enp0s9", SourceAddress: "Eth-Trunk1 · LACP", TargetAddress: "bond4 · 60.11.42.99/19", Phase: "planned"},
-			{ID: "sw2-os-b", SourcePort: "GE0/0/3", TargetPort: "enp0s10", SourceAddress: "Eth-Trunk1 · LACP", TargetAddress: "bond4 · 60.11.42.99/19", Phase: "planned"},
+			{ID: "pc-sw2", SourcePort: "Installation NIC", TargetPort: "GE0/0/3", SourceAddress: "62.2.90.164", TargetAddress: "62.2.90.x", Phase: "planned"},
+			{ID: "sw2-os-a", SourcePort: "GE0/0/1", TargetPort: "enp0s9", SourceAddress: "Eth-Trunk1 · LACP", TargetAddress: "bond4 · 60.11.42.99/19", Phase: "planned"},
+			{ID: "sw2-os-b", SourcePort: "GE0/0/2", TargetPort: "enp0s10", SourceAddress: "Eth-Trunk1 · LACP", TargetAddress: "bond4 · 60.11.42.99/19", Phase: "planned"},
 			{ID: "ibmc-os", SourcePort: "SOL / COM1", TargetPort: "ttyS0", SourceAddress: "115200 8N1", TargetAddress: "OS login", Phase: "configured"},
 		},
 	}

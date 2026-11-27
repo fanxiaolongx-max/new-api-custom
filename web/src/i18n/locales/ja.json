@@ -6120,6 +6120,11 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Port up": "ポート up",
+    "Port down": "ポート down",
+    "Port degraded": "ポート異常（集約未参加）",
+    "Port status unknown": "ポート状態不明",
+    "Port status is out of date": "ポート状態が古くなっています"
   }
 }

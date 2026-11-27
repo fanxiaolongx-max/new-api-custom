@@ -59,6 +59,25 @@ export async function factoryResetLab(): Promise<LabResetResult> {
   }>('/api/system/lab/factory-reset', undefined, { skipErrorHandler: true })
   return response.data.data ?? { ok: false, log: response.data.message ?? '' }
 }
+export type LabPortState = 'up' | 'down' | 'warn' | 'unknown'
+export interface LabEndpointStatus {
+  state: LabPortState
+  label: string
+  detail: string
+}
+export interface LabLinkStatus {
+  updated: number
+  stale: boolean
+  endpoints: Record<string, LabEndpointStatus>
+  links: Partial<Record<LabLinkID, [string, string]>>
+}
+export async function getLabLinkStatus(): Promise<LabLinkStatus> {
+  const response = await api.get<{ data: LabLinkStatus }>(
+    '/api/system/lab/link-status',
+    { skipErrorHandler: true }
+  )
+  return response.data.data
+}
 export function labConsoleURL(id: number): string {
   if (!Number.isInteger(id) || id < 1 || id > 999999) return ''
   return `/guacamole/#/client/${btoa(`${id}\0c\0postgresql`).replace(/=+$/, '')}`
