@@ -255,6 +255,7 @@ export async function getVirtualMachines() {
     success: boolean
     consoles?: {
       switches: { name: string; id: number }[]
+      root_consoles?: Record<string, number>
       vm_consoles: Record<string, number>
     } | null
     data: VirtualMachine[]

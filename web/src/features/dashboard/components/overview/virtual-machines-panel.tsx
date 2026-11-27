@@ -113,6 +113,7 @@ function stateLabelKey(state: string): string {
 function MachineRow(props: {
   machine: VirtualMachine
   consoleID?: number
+  rootConsoleID?: number
   companionLocked: boolean
   pendingAction?: VirtualMachineAction
   actionsDisabled: boolean
@@ -122,14 +123,19 @@ function MachineRow(props: {
   onForcePowerOff: () => void
 }) {
   const { t } = useTranslation()
+  const [account, setAccount] = useState('dragon')
   const starting = props.pendingAction === 'start'
   const running = props.machine.state === 'running' && !starting
   const progressLabel =
     props.machine.state === 'saved'
       ? t('Restoring saved state…')
       : t('Starting virtual machine…')
-  const webConsolePath = props.consoleID
-    ? labConsoleURL(props.consoleID)
+  const consoleID =
+    account === 'root' && props.rootConsoleID
+      ? props.rootConsoleID
+      : props.consoleID
+  const webConsolePath = consoleID
+    ? labConsoleURL(consoleID)
     : WEB_CONSOLE_PATHS[props.machine.name]
   const canStart =
     starting ||
@@ -200,6 +206,19 @@ function MachineRow(props: {
         )}
         {running && (
           <>
+            {props.rootConsoleID && (
+              <label className='flex items-center gap-2 text-sm'>
+                {t('Username')}
+                <select
+                  className='bg-background rounded-md border px-2 py-1'
+                  value={account}
+                  onChange={(event) => setAccount(event.target.value)}
+                >
+                  <option value='dragon'>dragon</option>
+                  <option value='root'>root</option>
+                </select>
+              </label>
+            )}
             {webConsolePath ? (
               <>
                 <Button
@@ -443,6 +462,9 @@ export function VirtualMachinesPanel() {
           <MachineRow
             key={machine.name}
             machine={machine}
+            rootConsoleID={
+              machinesQuery.data?.consoles?.root_consoles?.[machine.name]
+            }
             consoleID={machinesQuery.data?.consoles?.vm_consoles[machine.name]}
             companionLocked={machine.name === 'feiniu' && win11IsActive}
             pendingAction={

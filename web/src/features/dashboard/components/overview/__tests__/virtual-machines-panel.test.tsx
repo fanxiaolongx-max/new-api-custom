@@ -128,6 +128,7 @@ describe('virtual machine management', () => {
       consoles: {
         switches: [{ name: 'S5700-LSW3', id: 14 }],
         vm_consoles: { 'DragonLab-Node-03': 15 },
+        root_consoles: { 'DragonLab-Node-03': 16 },
       },
     })
     const queryClient = renderPanel()
@@ -142,6 +143,19 @@ describe('virtual machine management', () => {
       'href',
       '/guacamole/#/client/MTUAYwBwb3N0Z3Jlc3Fs'
     )
+    await userEvent
+      .setup()
+      .selectOptions(
+        within(vm).getByRole('combobox', { name: 'Username' }),
+        'root'
+      )
+    expect(within(vm).getByText('Remote control').closest('a')).toHaveAttribute(
+      'href',
+      '/guacamole/#/client/MTYAYwBwb3N0Z3Jlc3Fs'
+    )
+    expect(
+      within(vm).getByRole('button', { name: 'Basic console mode' })
+    ).toBeEnabled()
     expect(screen.queryByText('S5700-LSW1')).not.toBeInTheDocument()
     queryClient.clear()
   })

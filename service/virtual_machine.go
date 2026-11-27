@@ -54,8 +54,9 @@ type WorkspaceSwitch struct {
 }
 
 type WorkspaceConsoles struct {
-	Switches   []WorkspaceSwitch `json:"switches"`
-	VMConsoles map[string]int    `json:"vm_consoles"`
+	RootConsoles map[string]int    `json:"root_consoles"`
+	Switches     []WorkspaceSwitch `json:"switches"`
+	VMConsoles   map[string]int    `json:"vm_consoles"`
 }
 
 func ReadWorkspaceConsoles() *WorkspaceConsoles {
