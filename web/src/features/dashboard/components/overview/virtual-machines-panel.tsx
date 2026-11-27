@@ -78,6 +78,8 @@ const WEB_CONSOLE_PATHS: Readonly<Record<string, string>> = {
   winXP: '/guacamole/#/client/MgBjAHBvc3RncmVzcWw',
   win11: '/guacamole/#/client/MwBjAHBvc3RncmVzcWw',
   feiniu: '/guacamole/#/client/NABjAHBvc3RncmVzcWw',
+  mafuli: '/guacamole/#/client/MTIAYwBwb3N0Z3Jlc3Fs',
+  root: '/guacamole/#/client/MTMAYwBwb3N0Z3Jlc3Fs',
   openEuler: '/guacamole/#/client/NgBjAHBvc3RncmVzcWw',
 }
 const ACTIVE_VM_STATES = new Set([
@@ -308,6 +310,9 @@ function IdleSaveSettings({ minutes }: { minutes: number }) {
 export function VirtualMachinesPanel() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [debianAccount, setDebianAccount] = useState<'mafuli' | 'root'>(
+    'mafuli'
+  )
   const [ibmcOpen, setIbmcOpen] = useState(false)
   const [consoleMachine, setConsoleMachine] = useState<string | null>(null)
   const [kindleScreenOpen, setKindleScreenOpen] = useState(false)
@@ -501,7 +506,7 @@ export function VirtualMachinesPanel() {
             />
             <div className='min-w-0'>
               <div className='flex flex-wrap items-center gap-2'>
-                <h4 className='font-medium'>mafuli</h4>
+                <h4 className='font-medium'>Debian</h4>
                 <Badge variant='secondary'>{t('SSH terminal')}</Badge>
               </div>
               <p className='text-muted-foreground mt-0.5 text-xs'>
@@ -509,20 +514,37 @@ export function VirtualMachinesPanel() {
               </p>
             </div>
           </div>
-          <Button
-            size='sm'
-            render={
-              <a
-                href='/terminal/#/client/bWFmdWxpAGMAZGViaWFuLXRlcm1pbmFs'
-                target='_blank'
-                rel='noreferrer'
-              />
-            }
-            nativeButton={false}
-          >
-            <Terminal data-icon='inline-start' />
-            {t('Open terminal')}
-          </Button>
+          <div className='flex flex-wrap items-center gap-2'>
+            <label className='flex items-center gap-2 text-sm'>
+              {t('Username')}
+              <select
+                className='bg-background rounded-md border px-2 py-1'
+                value={debianAccount}
+                onChange={(event) =>
+                  setDebianAccount(
+                    event.target.value === 'root' ? 'root' : 'mafuli'
+                  )
+                }
+              >
+                <option value='mafuli'>mafuli</option>
+                <option value='root'>root</option>
+              </select>
+            </label>
+            <Button
+              size='sm'
+              render={
+                <a
+                  href={WEB_CONSOLE_PATHS[debianAccount]}
+                  target='_blank'
+                  rel='noreferrer'
+                />
+              }
+              nativeButton={false}
+            >
+              <Terminal data-icon='inline-start' />
+              {t('Open terminal')}
+            </Button>
+          </div>
         </article>
         <article className='bg-background/55 flex flex-col gap-3 rounded-xl border p-3 lg:flex-row lg:items-center lg:justify-between'>
           <div className='flex min-w-0 items-center gap-3'>
@@ -536,7 +558,9 @@ export function VirtualMachinesPanel() {
                 <Badge variant='secondary'>{t('Telnet console')}</Badge>
               </div>
               <p className='text-muted-foreground mt-0.5 text-xs'>
-                {t('Huawei eNSP switch in win7. Start win7 and the device in eNSP first.')}
+                {t(
+                  'Huawei eNSP switch in win7. Start win7 and the device in eNSP first.'
+                )}
               </p>
             </div>
           </div>

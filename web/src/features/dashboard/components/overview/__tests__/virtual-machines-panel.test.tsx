@@ -99,14 +99,20 @@ describe('virtual machine management', () => {
   })
   test('offers mafuli a separate system terminal without virtual machine power controls', async () => {
     const queryClient = renderPanel()
-    const row = (await screen.findByText('mafuli')).closest('article')
+    const selector = await screen.findByRole('combobox', { name: 'Username' })
+    const row = selector.closest('article')
     if (!row) throw new Error('mafuli row not found')
 
     expect(within(row).getByText('SSH terminal')).toBeInTheDocument()
     const terminal = within(row).getByRole('button', { name: 'Open terminal' })
     expect(terminal).toHaveAttribute(
       'href',
-      '/terminal/#/client/bWFmdWxpAGMAZGViaWFuLXRlcm1pbmFs'
+      '/guacamole/#/client/MTIAYwBwb3N0Z3Jlc3Fs'
+    )
+    await userEvent.setup().selectOptions(selector, 'root')
+    expect(terminal).toHaveAttribute(
+      'href',
+      '/guacamole/#/client/MTMAYwBwb3N0Z3Jlc3Fs'
     )
     expect(terminal).toHaveAttribute('target', '_blank')
     expect(
