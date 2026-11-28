@@ -13,19 +13,52 @@ import vm_agent
 
 
 class WorkspaceInventoryTest(unittest.TestCase):
-    def test_only_registered_lab_slots_join_workspace(self):
-        with tempfile.TemporaryDirectory() as directory:
-            slots = Path(directory) / "slots.json"
-            with (
-                mock.patch.object(vm_agent, "LAB_SLOTS_PATH", slots),
-                mock.patch.object(vm_agent, "ALLOWED_VMS", ("openEuler",)),
-                mock.patch.object(vm_agent, "run_vbox", return_value=(
-                    '"DragonLab-Node-02" {id2}\n"private" {id3}\n'
-                )),
-            ):
-                self.assertEqual(vm_agent.managed_vm_names(), ("openEuler",))
-                slots.write_text('[{"vm":"DragonLab-Node-02"},{"vm":"DragonLab-Node-03"},{"vm":"private"}]')
-                self.assertEqual(vm_agent.managed_vm_names(), ("openEuler", "DragonLab-Node-02"))
+    def test_all_accessible_virtualbox_vms_join_workspace_without_exclusions(self):
+        with (
+            mock.patch.object(vm_agent, "ALLOWED_VMS", ("openEuler", "missingVM")),
+            mock.patch.object(vm_agent, "run_vbox", return_value=(
+                '"DragonLab-Node-02" {id2}\n'
+                '"<inaccessible>" {id-bad}\n'
+                '"Ubuntu-Test" {id3}\n'
+                '"openEuler" {id1}\n'
+            )),
+        ):
+            self.assertEqual(
+                vm_agent.managed_vm_names(),
+                ("openEuler", "DragonLab-Node-02", "Ubuntu-Test"),
+            )
+
+    def test_workspace_statuses_report_endpoints_and_invalidate_switches_when_win7_stops(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            mock.patch.object(vm_agent, "reconcile_vm_lifecycle"),
+            mock.patch.object(vm_agent.UnixHTTPServer, "reconcile_idle_saves"),
+            mock.patch.object(vm_agent, "load_idle_save_minutes", return_value=30),
+            mock.patch.object(vm_agent, "probe_tcp_reachable", side_effect=[True, False, True, True]),
+            mock.patch.object(vm_agent, "probe_ensp_switch_state", side_effect=["running", "stopped"]) as sw_probe,
+        ):
+            path = str(Path(directory) / "agent.sock")
+            server = vm_agent.UnixHTTPServer(path, vm_agent.Handler)
+            try:
+                first = server.workspace_statuses([{"name": "win7", "state": "running"}])
+                self.assertEqual(first["Kindle"], {"state": "running"})
+                self.assertEqual(first["Debian"], {"state": "offline"})
+                self.assertEqual(first["S5700-LSW1"], {"state": "running"})
+                self.assertEqual(first["S5700-LSW2"], {"state": "stopped"})
+                self.assertEqual(sw_probe.call_count, 2)
+
+                # Cache hit while win7 remains running does not re-probe.
+                cached = server.workspace_statuses([{"name": "win7", "state": "running"}])
+                self.assertEqual(cached, first)
+                self.assertEqual(sw_probe.call_count, 2)
+
+                # Stopping win7 bypasses TTL cache so switches update immediately.
+                with mock.patch.object(vm_agent, "probe_ensp_switch_state", return_value="stopped") as stop_probe:
+                    after_stop = server.workspace_statuses([{"name": "win7", "state": "saved"}])
+                self.assertEqual(after_stop["S5700-LSW1"], {"state": "stopped"})
+                self.assertEqual(stop_probe.call_count, 2)
+            finally:
+                server.server_close()
 
 
 class VirtualMachineLifecycleTest(unittest.TestCase):

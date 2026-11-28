@@ -23,6 +23,19 @@ func TestIBMCStatusPreservesSimulationAndActualPowerState(t *testing.T) {
 	assert.Equal(t, "poweroff", status["state"])
 }
 
+func TestIBMCStatusRequestsSelectedLabNode(t *testing.T) {
+	withVMAgentFixture(t, func(request *http.Request) (*http.Response, error) {
+		assert.Equal(t, http.MethodGet, request.Method)
+		assert.Equal(t, "/v1/ibmc", request.URL.Path)
+		assert.Equal(t, "Node-02", request.URL.Query().Get("node"))
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"simulation":true,"state":"running","name":"DragonLab-Node-02","node":"Node-02","serial":true}`))}, nil
+	})
+	status, err := GetIBMCForNode("Node-02")
+	require.NoError(t, err)
+	assert.Equal(t, "DragonLab-Node-02", status["name"])
+	assert.Equal(t, "Node-02", status["node"])
+}
+
 func TestIBMCForwardsSerialBytesWithoutChangingThePayload(t *testing.T) {
 	withVMAgentFixture(t, func(request *http.Request) (*http.Response, error) {
 		assert.Equal(t, http.MethodPost, request.Method)

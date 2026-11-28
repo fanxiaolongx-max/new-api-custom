@@ -185,7 +185,7 @@ describe('virtual machine management', () => {
     queryClient.clear()
   })
 
-  test('opens the openEuler SSH workspace when the VM is running', async () => {
+  test('displays openEuler as DragonLab-Node-01 and opens its SSH workspace when running', async () => {
     getVirtualMachines.mockResolvedValueOnce({
       success: true,
       data: [
@@ -193,14 +193,17 @@ describe('virtual machine management', () => {
           name: 'openEuler',
           state: 'running',
           os_type: 'Oracle Linux (64-bit)',
-          memory_mb: 2048,
+          memory_mb: 1024,
           cpu_count: 2,
         },
       ],
     })
     const queryClient = renderPanel()
-    const row = (await screen.findByText('openEuler')).closest('article')
-    if (!row) throw new Error('openEuler row not found')
+    const row = (await screen.findByText('DragonLab-Node-01')).closest(
+      'article'
+    )
+    if (!row) throw new Error('DragonLab-Node-01 row not found')
+    expect(screen.queryByText('openEuler')).not.toBeInTheDocument()
     expect(
       within(row).getByRole('button', { name: 'Remote control' })
     ).toHaveAttribute('href', '/guacamole/#/client/NgBjAHBvc3RncmVzcWw')
@@ -530,4 +533,53 @@ describe('virtual machine management', () => {
       queryClient.clear()
     }
   )
+
+  test('displays live running or offline status for workspace endpoints and newly discovered VMs', async () => {
+    getVirtualMachines.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          name: 'Ubuntu 24.04',
+          state: 'running',
+          os_type: 'Ubuntu (64-bit)',
+          memory_mb: 2048,
+          cpu_count: 2,
+        },
+      ],
+      workspaces: {
+        Kindle: { state: 'offline' },
+        Debian: { state: 'running' },
+        'S5700-LSW1': { state: 'running' },
+        'S5700-LSW2': { state: 'stopped' },
+      },
+      consoles: {
+        switches: [
+          { name: 'S5700-LSW1', id: 7 },
+          { name: 'S5700-LSW2', id: 8 },
+        ],
+        vm_consoles: {},
+      },
+    })
+    const queryClient = renderPanel()
+
+    const customVM = (await screen.findByText('Ubuntu 24.04')).closest('article')
+    const kindle = screen.getByText('Kindle').closest('article')
+    const debian = screen.getByText('Debian').closest('article')
+    const lsw1 = screen.getByText('S5700-LSW1').closest('article')
+    const lsw2 = screen.getByText('S5700-LSW2').closest('article')
+    if (!customVM || !kindle || !debian || !lsw1 || !lsw2) {
+      throw new Error('Missing workspace card')
+    }
+
+    expect(within(customVM).getByText('Running')).toBeInTheDocument()
+    expect(
+      within(customVM).getByRole('button', { name: 'Remote control' })
+    ).toBeInTheDocument()
+    expect(within(kindle).getByText('Offline')).toBeInTheDocument()
+    expect(within(debian).getByText('Running')).toBeInTheDocument()
+    expect(within(lsw1).getByText('Running')).toBeInTheDocument()
+    expect(within(lsw2).getByText('Stopped')).toBeInTheDocument()
+
+    queryClient.clear()
+  })
 })

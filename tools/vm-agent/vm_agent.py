@@ -7,8 +7,11 @@ against fixed allowlists before invoking VBoxManage or the local VirtualBox SDK.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 import json
 
+import ibmc
 from ibmc import IBMC, SerialConsole
 import os
 import re
@@ -21,7 +24,7 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 SOCKET_PATH = os.environ.get("VM_AGENT_SOCKET", "/run/new-api-vm-agent/agent.sock")
 VBOX_MANAGE = os.environ.get("VBOX_MANAGE", "/usr/bin/VBoxManage")
@@ -100,40 +103,77 @@ def run_vbox(*args: str, timeout: int = 20) -> str:
 
 
 LAB_SLOTS_PATH = Path("/var/lib/new-api-vm-agent/lab-os-slots.json")
+WORKSPACE_CONSOLES_PATH = Path(
+    os.environ.get("VM_AGENT_WORKSPACE_CONSOLES_PATH", "/run/new-api-vm-agent/workspace-consoles.json")
+)
+KINDLE_HOST = os.environ.get("VM_AGENT_KINDLE_HOST", "192.168.100.207")
+KINDLE_PORT = int(os.environ.get("VM_AGENT_KINDLE_PORT", "22"))
+DEBIAN_SSH_HOST = os.environ.get("VM_AGENT_DEBIAN_SSH_HOST", "172.19.0.1")
+DEBIAN_SSH_PORT = int(os.environ.get("VM_AGENT_DEBIAN_SSH_PORT", "22"))
+WORKSPACE_STATUS_TTL = float(os.environ.get("VM_AGENT_WORKSPACE_STATUS_TTL", "15"))
 
 
-def managed_vm_names() -> tuple[str, ...]:
-    """Include provisioned lab slots while keeping unmapped host VMs private."""
+def read_lab_slots_raw() -> list[dict[str, object]]:
     try:
         slots = json.loads(LAB_SLOTS_PATH.read_text())
     except (OSError, ValueError):
-        return ALLOWED_VMS
+        return []
     if not isinstance(slots, list):
+        return []
+    return [slot for slot in slots if isinstance(slot, dict)]
+
+
+def registered_vm_names() -> list[str]:
+    names: list[str] = []
+    for line in run_vbox("list", "vms").splitlines():
+        name = line.rpartition('" {')[0].removeprefix('"')
+        if name and name != "<inaccessible>":
+            names.append(name)
+    return names
+
+
+def registered_vm_set() -> set[str]:
+    return set(registered_vm_names())
+
+
+def lab_ibmc_slots() -> list[dict[str, str]]:
+    """Return provisioned lab slots (excluding Node-01) registered in VirtualBox."""
+    entries: list[dict[str, str]] = []
+    for slot in read_lab_slots_raw():
+        name = slot.get("name")
+        vm = slot.get("vm")
+        if (
+            isinstance(name, str)
+            and re.fullmatch(r"Node-[0-9]{2,3}", name)
+            and name != "Node-01"
+            and isinstance(vm, str)
+            and re.fullmatch(r"DragonLab-Node-[0-9]+", vm)
+        ):
+            entries.append({"name": name, "vm": vm})
+    if not entries:
+        return []
+    registered = registered_vm_set()
+    return [entry for entry in entries if entry["vm"] in registered]
+
+
+def managed_vm_names() -> tuple[str, ...]:
+    """Discover all accessible VirtualBox VMs (without an exclusion list)."""
+    try:
+        discovered = registered_vm_names()
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         return ALLOWED_VMS
-    candidates = [
-        slot["vm"] for slot in slots
-        if isinstance(slot, dict) and isinstance(slot.get("vm"), str)
-        and re.fullmatch(r"DragonLab-Node-[0-9]+", slot["vm"])
-    ]
-    if not candidates:
+    if not discovered:
         return ALLOWED_VMS
-    registered = {
-        line.rpartition('" {')[0].removeprefix('"')
-        for line in run_vbox("list", "vms").splitlines()
-    }
-    return tuple(dict.fromkeys((*ALLOWED_VMS, *(vm for vm in candidates if vm in registered))))
+    discovered_set = set(discovered)
+    ordered = [name for name in ALLOWED_VMS if name in discovered_set]
+    return tuple(dict.fromkeys((*ordered, *discovered)))
 
 
 def lab_guest_serial_path(node: str) -> Path | None:
     """COM1 socket of a provisioned lab slot such as Node-02, or None."""
     if not re.fullmatch(r"Node-[0-9]{2,3}", node):
         return None
-    try:
-        slots = json.loads(LAB_SLOTS_PATH.read_text())
-    except (OSError, ValueError):
-        return None
-    vm = next((slot.get("vm") for slot in slots if isinstance(slot, dict)
-               and slot.get("name") == node), None) if isinstance(slots, list) else None
+    vm = next((slot.get("vm") for slot in read_lab_slots_raw() if slot.get("name") == node), None)
     if not isinstance(vm, str) or not re.fullmatch(r"DragonLab-Node-[0-9]+", vm):
         return None
     mode = machine_readable_values(vm).get("uartmode1", "")
@@ -171,9 +211,55 @@ def machine_info(name: str) -> dict[str, object]:
         "name": name,
         "state": STATE_NAMES.get(raw_state, raw_state),
         "os_type": values.get("ostype", ""),
-        "memory_mb": int(values.get("memory", "0")),
-        "cpu_count": int(values.get("cpus", "0")),
+        "memory_mb": int(values.get("memory") or "0"),
+        "cpu_count": int(values.get("cpus") or "0"),
     }
+
+
+def probe_tcp_reachable(host: str, port: int, timeout: float = 0.6) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def probe_ensp_switch_state(port: int, win7_running: bool) -> str:
+    if not win7_running:
+        return "stopped"
+    if has_established_connection(port):
+        return "running"
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.4) as sock:
+            sock.settimeout(0.15)
+            try:
+                data = sock.recv(1)
+            except TimeoutError:
+                return "running"
+            return "running" if data else "stopped"
+    except OSError:
+        return "stopped"
+
+
+def ensp_switch_targets() -> list[tuple[str, int]]:
+    defaults = [("S5700-LSW1", 2000), ("S5700-LSW2", 2001)]
+    try:
+        consoles = json.loads(WORKSPACE_CONSOLES_PATH.read_text(encoding="utf-8"))
+        switches = consoles.get("switches", []) if isinstance(consoles, dict) else []
+    except (OSError, ValueError):
+        return defaults
+    targets: list[tuple[str, int]] = []
+    for item in switches:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+            continue
+        name = item["name"]
+        match = re.search(r"(\d+)$", name)
+        if not match:
+            continue
+        index = int(match.group(1))
+        if index >= 1:
+            targets.append((name, 1999 + index))
+    return targets or defaults
 
 
 def rdp_port_for_machine(name: str) -> int | None:
@@ -299,9 +385,13 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
         self.control_lock = threading.Lock()
         self.ibmc = IBMC(run_vbox, machine_readable_values)
         self.ibmc.serial.start()
+        self.guest_ibmcs: dict[str, IBMC] = {}
+        self.guest_ibmcs_lock = threading.Lock()
         self.guest_serials: dict[str, SerialConsole] = {}
         self.guest_serials_lock = threading.Lock()
         self.settings_lock = threading.Lock()
+        self.workspace_status_lock = threading.Lock()
+        self.workspace_status_cache: tuple[float, bool, dict[str, dict[str, str]]] | None = None
         self.next_lifecycle_check = time.monotonic()
         self.idle_save_minutes = load_idle_save_minutes()
         self.last_control_activity = {
@@ -362,8 +452,36 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
         super().server_bind()
         os.chmod(socket_path, 0o660)
 
+    def ibmc_nodes(self) -> list[dict[str, str]]:
+        nodes = [{"node": "Node-01", "vm": ibmc.VM_NAME}]
+        for slot in lab_ibmc_slots():
+            nodes.append({"node": slot["name"], "vm": slot["vm"]})
+        return nodes
+
+    def ibmc_for(self, node: str) -> tuple[str, IBMC] | tuple[None, None]:
+        if node in ("", "Node-01"):
+            return "Node-01", self.ibmc
+        if not re.fullmatch(r"Node-[0-9]{2,3}", node):
+            return None, None
+        slot = next((entry for entry in lab_ibmc_slots() if entry["name"] == node), None)
+        if slot is None:
+            return None, None
+        with self.guest_ibmcs_lock:
+            controller = self.guest_ibmcs.get(node)
+            if controller is None:
+                console = self.serial_for(node)
+                controller = IBMC(
+                    run_vbox,
+                    machine_readable_values,
+                    vm_name=slot["vm"],
+                    state_path=ibmc.STATE_PATH.with_name(f"ibmc-{node}.json"),
+                    serial=console,
+                )
+                self.guest_ibmcs[node] = controller
+            return node, controller
+
     def serial_for(self, node: str) -> SerialConsole | None:
-        if not node:
+        if node in ("", "Node-01"):
             return self.ibmc.serial
         with self.guest_serials_lock:
             console = self.guest_serials.get(node)
@@ -379,6 +497,39 @@ class UnixHTTPServer(ThreadingMixIn, HTTPServer):
                 while console.connection is None and time.monotonic() < deadline:
                     time.sleep(0.05)
             return console
+
+    def start_lab_guest_serials(self) -> None:
+        for slot in read_lab_slots_raw():
+            node = slot.get("name")
+            if isinstance(node, str) and re.fullmatch(r"Node-[0-9]{2,3}", node) and node != "Node-01":
+                try:
+                    self.serial_for(node)
+                except Exception as exc:
+                    print(f"vm-agent: failed to attach serial for {node}: {exc}", flush=True)
+
+    def workspace_statuses(self, vms: list[dict[str, object]]) -> dict[str, dict[str, str]]:
+        win7_running = any(vm.get("name") == "win7" and vm.get("state") == "running" for vm in vms)
+        now = time.monotonic()
+        with self.workspace_status_lock:
+            cached = self.workspace_status_cache
+            if cached is not None and cached[1] == win7_running and now - cached[0] < WORKSPACE_STATUS_TTL:
+                return cached[2]
+        targets = ensp_switch_targets()
+        statuses: dict[str, dict[str, str]] = {}
+        with ThreadPoolExecutor(max_workers=max(2, len(targets) + 2)) as pool:
+            kindle_future = pool.submit(probe_tcp_reachable, KINDLE_HOST, KINDLE_PORT)
+            debian_future = pool.submit(probe_tcp_reachable, DEBIAN_SSH_HOST, DEBIAN_SSH_PORT, 0.3)
+            switch_futures = {
+                name: pool.submit(probe_ensp_switch_state, port, win7_running)
+                for name, port in targets
+            }
+            statuses["Kindle"] = {"state": "running" if kindle_future.result() else "offline"}
+            statuses["Debian"] = {"state": "running" if debian_future.result() else "offline"}
+            for name, future in switch_futures.items():
+                statuses[name] = {"state": future.result()}
+        with self.workspace_status_lock:
+            self.workspace_status_cache = (time.monotonic(), win7_running, statuses)
+        return statuses
 
     def server_close(self) -> None:
         self.ibmc.serial.stop()
@@ -454,12 +605,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         try:
-            if urlparse(self.path).path == "/v1/ibmc":
-                self.send_json(200, self.server.ibmc.status())
+            parsed = urlparse(self.path)
+            if parsed.path == "/v1/ibmc":
+                query = parse_qs(parsed.query)
+                node = query.get("node", [""])[0]
+                resolved_node, controller = self.server.ibmc_for(node)
+                if controller is None:
+                    self.send_json(404, {"error": "unknown iBMC node"})
+                    return
+                status = controller.status()
+                status["node"] = resolved_node
+                status["nodes"] = self.server.ibmc_nodes()
+                self.send_json(200, status)
                 return
-            if urlparse(self.path).path == "/v1/ibmc/serial":
-                from urllib.parse import parse_qs
-                query = parse_qs(urlparse(self.path).query)
+            if parsed.path == "/v1/ibmc/serial":
+                query = parse_qs(parsed.query)
                 console = self.server.serial_for(query.get("node", [""])[0])
                 if console is None:
                     self.send_json(404, {"error": "unknown serial node"})
@@ -472,7 +632,8 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             if urlparse(self.path).path == "/v1/vms":
-                self.send_json(200, {"vms": [machine_info(name) for name in managed_vm_names()]})
+                vms = [machine_info(name) for name in managed_vm_names()]
+                self.send_json(200, {"vms": vms, "workspaces": self.server.workspace_statuses(vms)})
                 return
 
             name, suffix = self.route()
@@ -520,11 +681,22 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/v1/ibmc/action":
                 payload = self.read_json()
+                node = payload.pop("node", "")
+                if node is None:
+                    node = ""
+                if not isinstance(node, str):
+                    raise ValueError("Invalid iBMC node")
+                resolved_node, controller = self.server.ibmc_for(node)
+                if controller is None:
+                    self.send_json(404, {"error": "unknown iBMC node"})
+                    return
                 if not self.server.control_lock.acquire(timeout=10):
                     self.send_json(409, {"error": "VirtualBox is busy"})
                     return
                 try:
-                    self.send_json(200, self.server.ibmc.action(payload))
+                    if payload.get("action") == "start" and resolved_node != "Node-01":
+                        self.server.serial_for(resolved_node)
+                    self.send_json(200, controller.action(payload))
                 finally:
                     self.server.control_lock.release()
                 return
@@ -586,6 +758,13 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if name == WINDOWS_VM:
                     configure_windows_resources(info)
+                for slot in read_lab_slots_raw():
+                    if slot.get("vm") == name and isinstance(slot.get("name"), str):
+                        try:
+                            self.server.serial_for(slot["name"])
+                        except Exception as exc:
+                            print(f"vm-agent: failed to attach serial for {name}: {exc}", flush=True)
+                        break
                 start_machine(name)
                 self.server.mark_control_activity(name)
             except Exception:
@@ -664,6 +843,7 @@ def main() -> None:
     if not ALLOWED_VMS:
         raise SystemExit("VM_AGENT_VMS must contain at least one VM")
     with UnixHTTPServer(SOCKET_PATH, Handler) as server:
+        server.start_lab_guest_serials()
         print(f"vm-agent: listening on {SOCKET_PATH} for {', '.join(ALLOWED_VMS)}", flush=True)
         server.serve_forever()
 

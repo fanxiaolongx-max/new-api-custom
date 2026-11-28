@@ -65,6 +65,7 @@ import { cn } from '@/lib/utils'
 
 import { KindleScreen } from './kindle-screen'
 import { VirtualMachineConsole } from './virtual-machine-console'
+import { displayVirtualMachineName } from './virtual-machine-names'
 
 const IBMCPanel = lazy(() => import('./ibmc-panel'))
 
@@ -103,11 +104,31 @@ function stateLabelKey(state: string): string {
     saved: 'Saved',
     paused: 'Paused',
     aborted: 'Aborted',
+    stopped: 'Stopped',
+    offline: 'Offline',
     error: 'Error',
     starting: 'Starting virtual machine…',
     restoring: 'Restoring saved state…',
   }
   return labels[state] ?? 'Unknown'
+}
+
+function WorkspaceStatusBadge({ state }: { state?: string }) {
+  const { t } = useTranslation()
+  if (!state) return null
+  const running = state === 'running'
+  return (
+    <Badge variant={running ? 'default' : 'secondary'} className='gap-1.5'>
+      <span
+        className={cn(
+          'size-2 shrink-0 rounded-full',
+          running ? 'bg-emerald-400' : 'bg-muted-foreground/45'
+        )}
+        aria-hidden='true'
+      />
+      {t(stateLabelKey(state))}
+    </Badge>
+  )
 }
 
 function MachineRow(props: {
@@ -154,7 +175,9 @@ function MachineRow(props: {
         />
         <div className='min-w-0'>
           <div className='flex flex-wrap items-center gap-2'>
-            <h4 className='font-medium'>{props.machine.name}</h4>
+            <h4 className='font-medium'>
+              {displayVirtualMachineName(props.machine.name)}
+            </h4>
             <Badge variant={running ? 'default' : 'secondary'}>
               {t(stateLabelKey(props.machine.state))}
             </Badge>
@@ -364,7 +387,9 @@ export function VirtualMachinesPanel() {
       controlVirtualMachine(request.name, request.action),
     onSuccess: (_, request) => {
       toast.success(
-        t('Virtual machine {{name}} command accepted', { name: request.name })
+        t('Virtual machine {{name}} command accepted', {
+          name: displayVirtualMachineName(request.name),
+        })
       )
     },
     onError: () => {
@@ -497,6 +522,9 @@ export function VirtualMachinesPanel() {
             <div>
               <div className='flex flex-wrap items-center gap-2'>
                 <h4 className='font-medium'>Kindle</h4>
+                <WorkspaceStatusBadge
+                  state={machinesQuery.data?.workspaces?.['Kindle']?.state}
+                />
                 <Badge variant='secondary'>{t('SSH terminal')}</Badge>
               </div>
               <p className='text-muted-foreground mt-0.5 text-xs'>
@@ -538,6 +566,9 @@ export function VirtualMachinesPanel() {
             <div className='min-w-0'>
               <div className='flex flex-wrap items-center gap-2'>
                 <h4 className='font-medium'>Debian</h4>
+                <WorkspaceStatusBadge
+                  state={machinesQuery.data?.workspaces?.['Debian']?.state}
+                />
                 <Badge variant='secondary'>{t('SSH terminal')}</Badge>
               </div>
               <p className='text-muted-foreground mt-0.5 text-xs'>
@@ -591,6 +622,9 @@ export function VirtualMachinesPanel() {
                 <div className='min-w-0'>
                   <div className='flex flex-wrap items-center gap-2'>
                     <h4 className='font-medium'>{name}</h4>
+                    <WorkspaceStatusBadge
+                      state={machinesQuery.data?.workspaces?.[name]?.state}
+                    />
                     <Badge variant='secondary'>{t('Telnet console')}</Badge>
                   </div>
                   <p className='text-muted-foreground mt-0.5 text-xs'>

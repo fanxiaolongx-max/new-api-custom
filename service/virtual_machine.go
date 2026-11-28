@@ -72,8 +72,18 @@ func ReadWorkspaceConsoles() *WorkspaceConsoles {
 	return &consoles
 }
 
+type WorkspaceStatus struct {
+	State string `json:"state"`
+}
+
 type vmListResponse struct {
-	VMs []VirtualMachine `json:"vms"`
+	VMs        []VirtualMachine           `json:"vms"`
+	Workspaces map[string]WorkspaceStatus `json:"workspaces,omitempty"`
+}
+
+type VirtualMachinesSnapshot struct {
+	VMs        []VirtualMachine           `json:"vms"`
+	Workspaces map[string]WorkspaceStatus `json:"workspaces,omitempty"`
 }
 
 type vmActionResponse struct {
@@ -162,16 +172,24 @@ func decodeVMAgentResponse(response *http.Response, target any) error {
 	return &VMAgentResponseError{Status: response.StatusCode, Message: agentError.Error}
 }
 
-func ListVirtualMachines() ([]VirtualMachine, error) {
+func ListVirtualMachinesSnapshot() (VirtualMachinesSnapshot, error) {
 	response, err := callVMAgent(http.MethodGet, "/v1/vms", nil)
+	if err != nil {
+		return VirtualMachinesSnapshot{}, err
+	}
+	var result VirtualMachinesSnapshot
+	if err := decodeVMAgentResponse(response, &result); err != nil {
+		return VirtualMachinesSnapshot{}, err
+	}
+	return result, nil
+}
+
+func ListVirtualMachines() ([]VirtualMachine, error) {
+	snapshot, err := ListVirtualMachinesSnapshot()
 	if err != nil {
 		return nil, err
 	}
-	var result vmListResponse
-	if err := decodeVMAgentResponse(response, &result); err != nil {
-		return nil, err
-	}
-	return result.VMs, nil
+	return snapshot.VMs, nil
 }
 
 func GetVirtualMachineSettings() (VirtualMachineSettings, error) {

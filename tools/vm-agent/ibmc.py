@@ -1,4 +1,4 @@
-"""Virtual iBMC training controller. Only the allowlisted openEuler VM is managed.
+"""Virtual iBMC training controller. Only allowlisted lab VMs are managed.
 
 No IPMI emulation or physical sensor measurements are claimed. Serial traffic
 is private, bounded, ephemeral, and never written to event logs.
@@ -195,17 +195,19 @@ class SerialConsole:
 
 
 class IBMC:
-    def __init__(self, run_vbox, machine_values):
+    def __init__(self, run_vbox, machine_values, vm_name=None, state_path=None, serial=None):
         self.run = run_vbox
         self.values = machine_values
+        self.vm_name = vm_name or VM_NAME
+        self.state_path = Path(state_path) if state_path else STATE_PATH
         self.lock = threading.RLock()
-        self.serial = SerialConsole()
+        self.serial = SerialConsole() if serial is None and vm_name is None else serial
         self.events = deque(maxlen=200)
         self.uid = False
         self.alarm = "normal"
         self.last_state = None
         try:
-            state = json.loads(STATE_PATH.read_text())
+            state = json.loads(self.state_path.read_text())
             self.events.extend(state.get("events", [])[-200:])
             self.uid = bool(state.get("uid", False))
             self.alarm = state.get("alarm", "normal")
@@ -214,11 +216,11 @@ class IBMC:
 
     def event(self, action, success=True, detail=""):
         self.events.appendleft({"id": secrets.token_hex(8), "time": int(time.time()), "action": action, "success": success, "detail": detail})
-        STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        temporary = STATE_PATH.with_suffix(".tmp")
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.state_path.with_suffix(".tmp")
         temporary.write_text(json.dumps({"events": list(self.events), "uid": self.uid, "alarm": self.alarm}))
         temporary.chmod(0o600)
-        temporary.replace(STATE_PATH)
+        temporary.replace(self.state_path)
 
     def media(self):
         if not MEDIA_ROOT.exists():
@@ -229,7 +231,7 @@ class IBMC:
 
     def status(self):
         with self.lock:
-            v = self.values(VM_NAME)
+            v = self.values(self.vm_name)
             state = v.get("VMState", "unknown")
             if self.last_state is not None and self.last_state != state:
                 self.event("power_state", detail=state)
@@ -237,14 +239,14 @@ class IBMC:
             snapshots = [{"id": value, "name": v.get(key.replace("SnapshotUUID", "SnapshotName"), "")}
                          for key, value in v.items() if key.startswith("SnapshotUUID")]
             return {
-                "name": VM_NAME, "simulation": True, "state": state,
+                "name": self.vm_name, "simulation": True, "state": state,
                 "uuid": v.get("UUID", ""), "memory_mb": int(v.get("memory", "0")),
                 "cpu_count": int(v.get("cpus", "0")), "firmware": v.get("firmware", "BIOS"),
                 "os": "openEuler 24.03 LTS-SP4", "state_changed": v.get("VMStateChangeTime", ""),
                 "boot": [v.get(f"boot{i}", "none") for i in range(1, 5)],
                 "nic": v.get("nic1", ""), "mac": v.get("macaddress1", ""),
                 "serial": v.get("uartmode1", "").startswith("server,"),
-                "serial_busy": bool(self.serial.token), "uid": self.uid, "alarm": self.alarm,
+                "serial_busy": bool(self.serial and self.serial.token), "uid": self.uid, "alarm": self.alarm,
                 "media": self.media(), "mounted_media": Path(v.get("SATA-1-0", "none")).name,
                 "snapshots": snapshots, "events": list(self.events),
                 "inventory": {key: value for key, value in v.items() if key in {
@@ -260,19 +262,19 @@ class IBMC:
         if not isinstance(action, str) or action not in allowed:
             raise ValueError("Unsupported iBMC action")
         with self.lock:
-            v = self.values(VM_NAME)
+            v = self.values(self.vm_name)
             state = v.get("VMState")
             try:
                 if action == "start":
                     if state not in {"poweroff", "aborted", "saved", "aborted-saved"}:
                         raise ValueError("VM cannot start in this state")
-                    self.run("startvm", VM_NAME, "--type", "headless", timeout=30)
+                    self.run("startvm", self.vm_name, "--type", "headless", timeout=30)
                 elif action in {"shutdown", "poweroff", "reset", "save", "pause", "resume"}:
                     expected = {"resume": {"paused"}, "poweroff": {"running", "paused"}, "save": {"running", "paused"}}.get(action, {"running"})
                     if state not in expected:
                         raise ValueError("VM state does not allow this power action")
                     command = {"shutdown": "acpipowerbutton", "save": "savestate"}.get(action, action)
-                    self.run("controlvm", VM_NAME, command, timeout=30)
+                    self.run("controlvm", self.vm_name, command, timeout=30)
                 elif action in {"boot", "mount", "eject", "snapshot"}:
                     if state not in {"poweroff", "aborted"}:
                         raise ValueError("Shut down the VM before changing boot, media, or snapshots")
@@ -281,7 +283,7 @@ class IBMC:
                         if device not in {"disk", "dvd", "net"}:
                             raise ValueError("Unsupported boot device")
                         fallback = "none" if device == "disk" else "disk"
-                        self.run("modifyvm", VM_NAME, "--boot1", device, "--boot2", fallback, "--boot3", "none", "--boot4", "none")
+                        self.run("modifyvm", self.vm_name, "--boot1", device, "--boot2", fallback, "--boot3", "none", "--boot4", "none")
                     elif action in {"mount", "eject"}:
                         medium = "none"
                         if action == "mount":
@@ -290,10 +292,10 @@ class IBMC:
                             if not isinstance(medium_id, str) or medium_id not in available:
                                 raise ValueError("Select an ISO from the approved media library")
                             medium = str(MEDIA_ROOT.resolve() / medium_id)
-                        self.run("storageattach", VM_NAME, "--storagectl", "SATA", "--port", "1", "--device", "0", "--type", "dvddrive", "--medium", medium)
+                        self.run("storageattach", self.vm_name, "--storagectl", "SATA", "--port", "1", "--device", "0", "--type", "dvddrive", "--medium", medium)
                     else:
                         name = "ibmc-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-                        self.run("snapshot", VM_NAME, "take", name, timeout=30)
+                        self.run("snapshot", self.vm_name, "take", name, timeout=30)
                 elif action == "uid":
                     if not isinstance(payload.get("enabled"), bool):
                         raise ValueError("UID enabled must be boolean")

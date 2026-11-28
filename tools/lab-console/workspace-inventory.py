@@ -12,7 +12,7 @@ sql = """SELECT coalesce(json_agg(row_to_json(c)), '[]') FROM (
           FROM guacamole_connection_parameter p WHERE p.connection_id=g.connection_id
           AND parameter_name IN ('hostname','port','username')) AS endpoint
   FROM guacamole_connection g
-  WHERE protocol = 'ssh' OR (protocol = 'telnet' AND connection_name ~* '(^|[-_ ])(LSW|SW)[0-9]+$')
+  WHERE protocol IN ('ssh', 'rdp', 'vnc') OR (protocol = 'telnet' AND connection_name ~* '(^|[-_ ])(LSW|SW)[0-9]+$')
   ORDER BY connection_id
 ) c"""
 rows = json.loads(subprocess.check_output(
@@ -20,10 +20,18 @@ rows = json.loads(subprocess.check_output(
      'exec psql -XqAt -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d guacamole'],
     input=sql, text=True, timeout=10,
 ))
-ssh_ids = {row["id"] for row in rows if row["protocol"] == "ssh"}
+remote_ids = {row["id"] for row in rows if row["protocol"] in ("ssh", "rdp", "vnc")}
 slots = json.loads(slots_path.read_text()) if slots_path.exists() else []
-bindings = {slot["vm"]: node["console_id"] for slot in slots for node in slot["nodes"]
-            if node["id"] == "os" and node["console_id"] in ssh_ids}
+bindings = {
+    row["name"]: row["id"]
+    for row in rows
+    if row["protocol"] in ("ssh", "rdp", "vnc") and not row["name"].endswith(" (root)")
+}
+bindings.update({
+    slot["vm"]: node["console_id"]
+    for slot in slots for node in slot["nodes"]
+    if node["id"] == "os" and node["console_id"] in remote_ids
+})
 ssh = {row["id"]: row for row in rows if row["protocol"] == "ssh" and row["endpoint"]}
 for row in ssh.values():
     if row["name"] == "openEuler":

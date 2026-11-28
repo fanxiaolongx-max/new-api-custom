@@ -43,6 +43,8 @@ import {
 } from '@/features/dashboard/api'
 import { cn } from '@/lib/utils'
 
+import { displayVirtualMachineName } from './virtual-machine-names'
+
 const SPECIAL_KEYS: Record<string, number[]> = {
   Enter: [0x1c, 0x9c],
   Backspace: [0x0e, 0x8e],
@@ -169,12 +171,16 @@ export function VirtualMachineConsole(props: VirtualMachineConsoleProps) {
     </span>
   )
 
+  const displayName = props.machineName
+    ? displayVirtualMachineName(props.machineName)
+    : ''
+
   return (
     <Dialog open={Boolean(props.machineName)} onOpenChange={props.onOpenChange}>
       <DialogContent className='max-h-[calc(100vh-2rem)] sm:max-w-6xl'>
         <DialogHeader>
           <DialogTitle>
-            {t('Remote console: {{name}}', { name: props.machineName ?? '' })}
+            {t('Remote console: {{name}}', { name: displayName })}
           </DialogTitle>
           <DialogDescription>
             {t(
@@ -224,7 +230,7 @@ export function VirtualMachineConsole(props: VirtualMachineConsoleProps) {
               ref={imageRef}
               src={screenshotUrl}
               alt={t('Current screen of {{name}}', {
-                name: props.machineName ?? '',
+                name: displayName,
               })}
               draggable={false}
               onContextMenu={(event) => event.preventDefault()}

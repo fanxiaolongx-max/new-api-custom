@@ -1,7 +1,15 @@
 import { api } from '@/lib/api'
 
+export interface IBMCNode {
+  node: string
+  vm: string
+}
+
 export interface IBMCStatus {
   name: string
+  node?: string
+  nodes?: IBMCNode[]
+  console_id?: number
   simulation: boolean
   state: string
   uuid: string
@@ -30,6 +38,7 @@ export interface IBMCStatus {
   inventory: Record<string, string>
 }
 export interface IBMCAction {
+  node?: string
   action:
     | 'start'
     | 'shutdown'
@@ -49,11 +58,15 @@ export interface IBMCAction {
   enabled?: boolean
   severity?: string
 }
-export async function getIBMC(): Promise<IBMCStatus> {
+export async function getIBMCForNode(node?: string): Promise<IBMCStatus> {
   const response = await api.get<{ data: IBMCStatus }>('/api/system/ibmc', {
+    params: node ? { node } : undefined,
     skipErrorHandler: true,
   })
   return response.data.data
+}
+export async function getIBMC(): Promise<IBMCStatus> {
+  return getIBMCForNode()
 }
 export async function controlIBMC(action: IBMCAction) {
   await api.post('/api/system/ibmc/action', action)

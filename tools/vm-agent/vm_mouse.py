@@ -5,16 +5,16 @@ import argparse
 
 from vboxapi import VirtualBoxManager
 
-from vm_agent import ALLOWED_VMS
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("name", choices=ALLOWED_VMS)
+    parser.add_argument("name")
     parser.add_argument("x", type=int)
     parser.add_argument("y", type=int)
     parser.add_argument("buttons", type=int)
     args = parser.parse_args()
+    if not args.name or args.name == "<inaccessible>":
+        parser.error("invalid virtual machine name")
     if not (0 <= args.x <= 65535 and 0 <= args.y <= 65535 and 0 <= args.buttons <= 7):
         parser.error("mouse input is out of range")
 

@@ -65,6 +65,29 @@ func TestListVirtualMachinesPreservesHostState(t *testing.T) {
 	}, machines[0])
 }
 
+func TestListVirtualMachinesSnapshotPreservesWorkspaceStatuses(t *testing.T) {
+	withVMAgentFixture(t, func(request *http.Request) (*http.Response, error) {
+		assert.Equal(t, http.MethodGet, request.Method)
+		assert.Equal(t, "/v1/vms", request.URL.Path)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(
+				`{"vms":[{"name":"Ubuntu","state":"running","os_type":"Ubuntu (64-bit)","memory_mb":2048,"cpu_count":2}],"workspaces":{"Kindle":{"state":"running"},"S5700-LSW1":{"state":"stopped"}}}`,
+			)),
+		}, nil
+	})
+
+	snapshot, err := ListVirtualMachinesSnapshot()
+
+	require.NoError(t, err)
+	require.Len(t, snapshot.VMs, 1)
+	assert.Equal(t, "Ubuntu", snapshot.VMs[0].Name)
+	assert.Equal(t, map[string]WorkspaceStatus{
+		"Kindle":     {State: "running"},
+		"S5700-LSW1": {State: "stopped"},
+	}, snapshot.Workspaces)
+}
+
 func TestControlVirtualMachineReturnsAgentValidationError(t *testing.T) {
 	withVMAgentFixture(t, func(request *http.Request) (*http.Response, error) {
 		assert.Equal(t, http.MethodPost, request.Method)

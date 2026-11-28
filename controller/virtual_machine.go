@@ -59,13 +59,18 @@ func writeVirtualMachineError(c *gin.Context, err error) {
 }
 
 func ListVirtualMachines(c *gin.Context) {
-	machines, err := service.ListVirtualMachines()
+	snapshot, err := service.ListVirtualMachinesSnapshot()
 	if err != nil {
 		writeVirtualMachineError(c, err)
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": machines, "consoles": service.ReadWorkspaceConsoles()})
+	c.JSON(http.StatusOK, gin.H{
+		"success":    true,
+		"data":       snapshot.VMs,
+		"workspaces": snapshot.Workspaces,
+		"consoles":   service.ReadWorkspaceConsoles(),
+	})
 }
 
 func GetVirtualMachineSettings(c *gin.Context) {

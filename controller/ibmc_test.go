@@ -41,3 +41,26 @@ func TestIBMCRejectsArbitraryActionsBeforeContactingHost(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	assert.Contains(t, recorder.Body.String(), "Invalid iBMC action")
 }
+
+func TestIBMCRejectsInvalidNodeNamesBeforeContactingHost(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, invalid := range []string{"openEuler", "../Node-02", "Node-1"} {
+		t.Run("GET_"+invalid, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodGet, "/api/system/ibmc?node="+invalid, nil)
+			GetIBMC(ctx)
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			assert.Contains(t, recorder.Body.String(), "Invalid iBMC node")
+		})
+		t.Run("POST_"+invalid, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/api/system/ibmc/action", strings.NewReader(`{"node":"`+invalid+`","action":"start"}`))
+			ctx.Request.Header.Set("Content-Type", "application/json")
+			ControlIBMC(ctx)
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			assert.Contains(t, recorder.Body.String(), "Invalid iBMC node")
+		})
+	}
+}

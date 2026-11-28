@@ -7,7 +7,11 @@ import type { IBMCStatus } from '@/features/dashboard/ibmc-api'
 
 import IBMCPanel from '../ibmc-panel'
 
-const mocks = vi.hoisted(() => ({ getIBMC: vi.fn(), controlIBMC: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  getIBMC: vi.fn(),
+  getIBMCForNode: vi.fn(),
+  controlIBMC: vi.fn(),
+}))
 vi.mock('@/features/dashboard/ibmc-api', () => mocks)
 
 const vm: IBMCStatus = {
@@ -117,6 +121,63 @@ describe('virtual iBMC', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Power and boot' }))
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Reset VM' })).toBeDisabled()
+    client.clear()
+  })
+  test('switches between openEuler nodes for status, SSH target, and actions', async () => {
+    const nodes = [
+      { node: 'Node-01', vm: 'openEuler' },
+      { node: 'Node-02', vm: 'DragonLab-Node-02' },
+    ]
+    const node1: IBMCStatus = {
+      ...vm,
+      node: 'Node-01',
+      nodes,
+      console_id: 6,
+    }
+    const node2: IBMCStatus = {
+      ...vm,
+      name: 'DragonLab-Node-02',
+      uuid: 'node-02-uuid',
+      memory_mb: 1024,
+      node: 'Node-02',
+      nodes,
+      console_id: 10,
+    }
+    mocks.getIBMC.mockResolvedValue(node1)
+    mocks.getIBMCForNode.mockImplementation(async (node?: string) =>
+      node === 'Node-02' ? node2 : node1
+    )
+    const { client } = setup()
+    await screen.findByText('test-vm')
+    const switcher = screen.getByRole('group', { name: 'Switch OS node' })
+    const btn1 = switcher.querySelectorAll('button')[0]
+    const btn2 = switcher.querySelectorAll('button')[1]
+    expect(btn1).toHaveTextContent('DragonLab-Node-01')
+    expect(btn1).toHaveAttribute('aria-pressed', 'true')
+    expect(btn2).toHaveTextContent('DragonLab-Node-02')
+    expect(btn2).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(btn2)
+    await screen.findByText('node-02-uuid')
+    expect(mocks.getIBMCForNode).toHaveBeenCalledWith('Node-02')
+    expect(btn2).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Remote control' }))
+    expect(
+      screen.getByRole('button', { name: 'Open terminal' })
+    ).toHaveAttribute('href', '/guacamole/#/client/MTAAYwBwb3N0Z3Jlc3Fs')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Power and boot' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Force power off' })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    await waitFor(() =>
+      expect(mocks.controlIBMC).toHaveBeenCalledWith(
+        { action: 'poweroff', node: 'Node-02' },
+        expect.anything()
+      )
+    )
     client.clear()
   })
 })

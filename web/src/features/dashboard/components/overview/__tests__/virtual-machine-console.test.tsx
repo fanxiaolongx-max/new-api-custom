@@ -65,6 +65,9 @@ describe('virtual machine pointer control', () => {
         'Virtual machine is not running. Start it before opening the console.'
       )
     ).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Remote console: DragonLab-Node-01'
+    )
     view.unmount()
     queryClient.clear()
   })

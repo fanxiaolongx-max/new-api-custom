@@ -13,8 +13,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func validIBMCNode(node string) bool {
+	return node == "" || ibmcSerialNodePattern.MatchString(node)
+}
+
 func GetIBMC(c *gin.Context) {
-	data, err := service.GetIBMC()
+	node := c.Query("node")
+	if !validIBMCNode(node) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid iBMC node"})
+		return
+	}
+	data, err := service.GetIBMCForNode(node)
 	if err != nil {
 		writeVirtualMachineError(c, err)
 		return
@@ -23,6 +32,7 @@ func GetIBMC(c *gin.Context) {
 }
 
 type ibmcActionRequest struct {
+	Node     string `json:"node,omitempty" binding:"omitempty,max=16"`
 	Action   string `json:"action" binding:"required,oneof=start shutdown poweroff reset save pause resume boot mount eject snapshot uid alarm"`
 	Device   string `json:"device,omitempty"`
 	Media    string `json:"media,omitempty"`
@@ -34,6 +44,10 @@ func ControlIBMC(c *gin.Context) {
 	var request ibmcActionRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(400, gin.H{"success": false, "message": "Invalid iBMC action"})
+		return
+	}
+	if !validIBMCNode(request.Node) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid iBMC node"})
 		return
 	}
 	data, err := service.CallIBMC(http.MethodPost, "/v1/ibmc/action", request)
@@ -66,7 +80,7 @@ func WriteIBMCSerial(c *gin.Context) {
 		c.JSON(400, gin.H{"success": false, "message": "Invalid serial request"})
 		return
 	}
-	if request.Node != "" && !ibmcSerialNodePattern.MatchString(request.Node) {
+	if !validIBMCNode(request.Node) {
 		c.JSON(400, gin.H{"success": false, "message": "Invalid serial node"})
 		return
 	}
@@ -90,7 +104,7 @@ func ReadIBMCSerial(c *gin.Context) {
 	session := c.GetHeader("X-IBMC-Session")
 	node := c.Query("node")
 	if err != nil || cursor < 0 || len(session) > 64 || session == "" ||
-		(node != "" && !ibmcSerialNodePattern.MatchString(node)) {
+		!validIBMCNode(node) {
 		c.JSON(400, gin.H{"success": false, "message": "Invalid serial cursor or session"})
 		return
 	}

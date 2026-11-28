@@ -250,6 +250,10 @@ export interface VirtualMachineSettings {
 
 export type VirtualMachineAction = 'start' | 'shutdown' | 'save' | 'poweroff'
 
+export interface WorkspaceStatus {
+  state: string
+}
+
 export async function getVirtualMachines() {
   const res = await api.get<{
     success: boolean
@@ -258,6 +262,7 @@ export async function getVirtualMachines() {
       root_consoles?: Record<string, number>
       vm_consoles: Record<string, number>
     } | null
+    workspaces?: Record<string, WorkspaceStatus> | null
     data: VirtualMachine[]
     message?: string
   }>('/api/system/virtual-machines', { skipErrorHandler: true })

@@ -65,6 +65,23 @@ class IBMCControlTest(unittest.TestCase):
         self.controller.action({'action': 'poweroff', 'name': 'win11'})
         self.run.assert_called_once_with('controlvm', 'openEuler', 'poweroff', timeout=30)
 
+    def test_secondary_node_uses_isolated_vm_name_and_state_file(self):
+        secondary_state = self.root / 'ibmc-Node-02.json'
+        node_values = {**self.values, 'UUID': 'node-02-uuid', 'VMState': 'running'}
+        node_serial = mock.Mock(token='')
+        secondary = ibmc.IBMC(self.run, lambda name: node_values, vm_name='DragonLab-Node-02', state_path=secondary_state, serial=node_serial)
+
+        self.controller.action({'action': 'uid', 'enabled': True})
+        secondary.action({'action': 'poweroff'})
+
+        primary_status = self.controller.status()
+        secondary_status = secondary.status()
+        self.assertEqual(primary_status['name'], 'openEuler')
+        self.assertTrue(primary_status['uid'])
+        self.assertEqual(secondary_status['name'], 'DragonLab-Node-02')
+        self.assertFalse(secondary_status['uid'])
+        self.run.assert_called_once_with('controlvm', 'DragonLab-Node-02', 'poweroff', timeout=30)
+
 
 class SerialConsoleTest(unittest.TestCase):
     def setUp(self):
@@ -163,3 +180,56 @@ class SerialAutoLoginTest(unittest.TestCase):
         self.console.accept_output(b'\r\nPassword: ')
         self.console.open(auto_login=True)
         self.console.connection.sendall.assert_not_called()
+
+
+class MultiNodeAgentTest(unittest.TestCase):
+    def test_http_endpoints_route_ibmc_status_and_actions_by_node(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            slots = root / 'slots.json'
+            slots.write_text('[{"name":"Node-02","vm":"DragonLab-Node-02"}]')
+            node2_controller = mock.Mock()
+            node2_controller.status.return_value = {'name': 'DragonLab-Node-02', 'state': 'poweroff'}
+            node2_controller.action.return_value = {'success': True}
+
+            node1_controller = mock.Mock()
+            node1_controller.status.return_value = {'name': 'openEuler', 'state': 'running'}
+
+            server = mock.Mock()
+            server.control_lock = vm_agent.threading.Lock()
+            server.ibmc_nodes.return_value = [
+                {'node': 'Node-01', 'vm': 'openEuler'},
+                {'node': 'Node-02', 'vm': 'DragonLab-Node-02'},
+            ]
+            server.ibmc_for.side_effect = lambda node: {
+                '': ('Node-01', node1_controller),
+                'Node-01': ('Node-01', node1_controller),
+                'Node-02': ('Node-02', node2_controller),
+            }.get(node, (None, None))
+
+            handler = mock.Mock()
+            handler.server = server
+            handler.path = '/v1/ibmc?node=Node-02'
+            vm_agent.Handler.do_GET(handler)
+            handler.send_json.assert_called_with(200, {
+                'name': 'DragonLab-Node-02',
+                'state': 'poweroff',
+                'node': 'Node-02',
+                'nodes': [
+                    {'node': 'Node-01', 'vm': 'openEuler'},
+                    {'node': 'Node-02', 'vm': 'DragonLab-Node-02'},
+                ],
+            })
+
+            handler.reset_mock()
+            handler.path = '/v1/ibmc?node=Node-99'
+            vm_agent.Handler.do_GET(handler)
+            handler.send_json.assert_called_with(404, {'error': 'unknown iBMC node'})
+
+            handler.reset_mock()
+            handler.path = '/v1/ibmc/action'
+            handler.read_json.return_value = {'node': 'Node-02', 'action': 'start'}
+            vm_agent.Handler.do_POST(handler)
+            server.serial_for.assert_called_once_with('Node-02')
+            node2_controller.action.assert_called_once_with({'action': 'start'})
+            handler.send_json.assert_called_with(200, {'success': True})

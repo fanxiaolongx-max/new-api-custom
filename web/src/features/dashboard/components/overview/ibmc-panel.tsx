@@ -36,12 +36,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   controlIBMC,
   getIBMC,
+  getIBMCForNode,
   type IBMCAction,
+  type IBMCNode,
 } from '@/features/dashboard/ibmc-api'
+import { labConsoleURL } from '@/features/dragon-lab/api'
 import { cn } from '@/lib/utils'
 
 import { IBMCInventory } from './ibmc-inventory'
 import { VirtualMachineConsole } from './virtual-machine-console'
+import { displayVirtualMachineName } from './virtual-machine-names'
 
 const SerialConsole = lazy(() => import('./ibmc-serial'))
 const BOOT_KEYS: Record<string, string> = {
@@ -85,18 +89,28 @@ const ACTION_KEYS: Record<string, string> = {
 export default function IBMCPanel(props: { onClose: () => void }) {
   const { t } = useTranslation()
   const client = useQueryClient()
+  const [selectedNode, setSelectedNode] = useState('')
+  const [knownNodes, setKnownNodes] = useState<IBMCNode[]>([])
   const [tab, setTab] = useState('overview')
   const [kvm, setKvm] = useState(false)
   const [confirmation, setConfirmation] = useState<IBMCAction | null>(null)
   const [media, setMedia] = useState('')
   const [boot, setBoot] = useState('disk')
   const [severity, setSeverity] = useState('warning')
+  const requestNode =
+    selectedNode && selectedNode !== 'Node-01' ? selectedNode : undefined
   const query = useQuery({
-    queryKey: QUERY_KEY,
-    queryFn: getIBMC,
+    queryKey: [...QUERY_KEY, selectedNode || 'Node-01'],
+    queryFn: () => (requestNode ? getIBMCForNode(requestNode) : getIBMC()),
     refetchInterval: 10000,
   })
   const vm = query.data
+  const nodes = vm?.nodes?.length ? vm.nodes : knownNodes
+  const activeNode = selectedNode || vm?.node || 'Node-01'
+  const activeRequestNode = activeNode === 'Node-01' ? undefined : activeNode
+  const sshConsolePath = vm?.console_id
+    ? labConsoleURL(vm.console_id)
+    : '/guacamole/#/client/NgBjAHBvc3RncmVzcWw'
   const mutation = useMutation({
     mutationFn: controlIBMC,
     onSuccess: async () => {
@@ -107,6 +121,20 @@ export default function IBMCPanel(props: { onClose: () => void }) {
       ])
     },
   })
+  const dispatchAction = (action: IBMCAction) => {
+    mutation.mutate(
+      activeRequestNode ? { ...action, node: activeRequestNode } : action
+    )
+  }
+  const selectNode = (node: string) => {
+    if (vm?.nodes?.length) {
+      setKnownNodes(vm.nodes)
+    }
+    setSelectedNode(node)
+    setKvm(false)
+    setConfirmation(null)
+    setMedia('')
+  }
   const off = vm?.state === 'poweroff' || vm?.state === 'aborted'
   const running = vm?.state === 'running'
   const paused = vm?.state === 'paused'
@@ -131,6 +159,29 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                 'Real VM controls and COM1 console. Physical iBMC firmware, IPMI and hardware sensors are not emulated.'
               )}
             </DialogDescription>
+            {nodes.length > 1 && (
+              <div
+                className='flex flex-wrap gap-1.5 pt-2'
+                role='group'
+                aria-label={t('Switch OS node')}
+              >
+                {nodes.map((item) => {
+                  const active = item.node === activeNode
+                  return (
+                    <Button
+                      key={item.node}
+                      type='button'
+                      size='sm'
+                      variant={active ? 'default' : 'outline'}
+                      aria-pressed={active}
+                      onClick={() => selectNode(item.node)}
+                    >
+                      {displayVirtualMachineName(item.vm)}
+                    </Button>
+                  )
+                })}
+              </div>
+            )}
           </DialogHeader>
           <div className='overflow-y-auto p-4 sm:p-5'>
             {query.isPending && <p role='status'>{t('Loading...')}</p>}
@@ -149,7 +200,9 @@ export default function IBMCPanel(props: { onClose: () => void }) {
               <div className='space-y-4'>
                 <div className='flex flex-wrap items-center justify-between gap-3'>
                   <div className='flex flex-wrap items-center gap-2'>
-                    <span className='text-lg font-semibold'>{vm.name}</span>
+                    <span className='text-lg font-semibold'>
+                      {displayVirtualMachineName(vm.name)}
+                    </span>
                     <Badge variant={running ? 'default' : 'secondary'}>
                       {t(STATE_KEYS[vm.state] ?? 'Unknown')}
                     </Badge>
@@ -278,7 +331,10 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                   </TabsContent>
                   <TabsContent value='sol'>
                     <Suspense fallback={<p role='status'>{t('Loading...')}</p>}>
-                      <SerialConsole />
+                      <SerialConsole
+                        key={activeNode}
+                        node={activeRequestNode}
+                      />
                     </Suspense>
                   </TabsContent>
                   <TabsContent value='remote' className='space-y-4'>
@@ -310,7 +366,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                         nativeButton={false}
                         render={
                           <a
-                            href='/guacamole/#/client/NgBjAHBvc3RncmVzcWw'
+                            href={sshConsolePath}
                             target='_blank'
                             rel='noreferrer'
                           />
@@ -329,7 +385,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                       <div className='flex flex-wrap gap-2'>
                         <Button
                           disabled={busy || (!off && vm.state !== 'saved')}
-                          onClick={() => mutation.mutate({ action: 'start' })}
+                          onClick={() => dispatchAction({ action: 'start' })}
                         >
                           {t('Start')}
                         </Button>
@@ -345,7 +401,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                         <Button
                           variant='outline'
                           disabled={busy || (!running && !paused)}
-                          onClick={() => mutation.mutate({ action: 'save' })}
+                          onClick={() => dispatchAction({ action: 'save' })}
                         >
                           {t('Save state')}
                         </Button>
@@ -353,7 +409,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                           variant='outline'
                           disabled={busy || (!running && !paused)}
                           onClick={() =>
-                            mutation.mutate({
+                            dispatchAction({
                               action: paused ? 'resume' : 'pause',
                             })
                           }
@@ -513,7 +569,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                           variant='outline'
                           disabled={busy}
                           onClick={() =>
-                            mutation.mutate({ action: 'uid', enabled: !vm.uid })
+                            dispatchAction({ action: 'uid', enabled: !vm.uid })
                           }
                         >
                           {t('Toggle simulated locator LED')}
@@ -537,7 +593,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                           variant='outline'
                           disabled={busy}
                           onClick={() =>
-                            mutation.mutate({ action: 'alarm', severity })
+                            dispatchAction({ action: 'alarm', severity })
                           }
                         >
                           {t('Apply simulated alarm')}
@@ -562,7 +618,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
                           const url = URL.createObjectURL(blob)
                           const link = document.createElement('a')
                           link.href = url
-                          link.download = 'ibmc-diagnostics.json'
+                          link.download = `ibmc-${displayVirtualMachineName(vm.name)}-diagnostics.json`
                           link.click()
                           URL.revokeObjectURL(url)
                         }}
@@ -614,7 +670,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
         </DialogContent>
       </Dialog>
       <VirtualMachineConsole
-        machineName={kvm ? 'openEuler' : null}
+        machineName={kvm && vm ? vm.name : null}
         onOpenChange={setKvm}
       />
       <AlertDialog
@@ -640,7 +696,7 @@ export default function IBMCPanel(props: { onClose: () => void }) {
             <AlertDialogCancel>{t('Cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (confirmation) mutation.mutate(confirmation)
+                if (confirmation) dispatchAction(confirmation)
                 setConfirmation(null)
               }}
             >
