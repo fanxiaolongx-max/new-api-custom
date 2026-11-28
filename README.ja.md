@@ -44,6 +44,7 @@
 </p>
 
 <p align="center">
+  <a href="#-カスタム拡張機能">カスタム機能</a> •
   <a href="#-クイックスタート">クイックスタート</a> •
   <a href="#-主な機能">主な機能</a> •
   <a href="#-デプロイ">デプロイ</a> •
@@ -60,6 +61,20 @@
 > - ユーザーは、上流の API キー、アカウント、モデルサービス、インターフェース権限を合法的に取得し、上流のサービス利用規約および適用される法律法規を遵守する必要があります。
 > - ユーザーは、利用方法が上流のサービス利用規約および適用される法律法規に準拠していることを確認してください。
 > - 生成 AI サービスを公衆に提供する場合、ユーザーは適用される規制要件を遵守し、管轄区域で求められる届出、ライセンス、コンテンツセキュリティ、本人確認、ログ保持、税務、上流認可などのすべての義務を履行してください。
+
+---
+
+## 🌟 カスタム拡張機能
+
+オープンソースの [New API](https://github.com/QuantumNous/new-api) を基盤に、運用自動化・ハードウェア監視・インタラクティブ演習機能を拡張しています（詳細は [English README](./README.md) および [简体中文](./README.zh_CN.md) を参照）：
+
+- **🧪 Dragon Lab トポロジーワークベンチ（ホーム `/`）**：5ノード構成（`Ops PC`、`SW1`、`SW2`、`iBMC`、`TaiShan OS`）のシングルスクリーン演習画面、マルチ OS ノード切替、Guacamole コンソールと COM1 シリアル接続、隔離スクリプトワークベンチ（`TaiSha.html` + `dragon-lab-workbench-bridge.js` + ライブ端末フィード）、一括ファクトリーリセット、細粒度権限 `dragon_lab.full` / `dragon_lab.desktop`（[ドキュメント](./docs/dragon-lab.md)）。
+- **🥊 マルチモデル・ストリーミングアリーナ**：Playground で 2〜4 モデルの並列比較ストリーミング、プロバイダー別グループ化、マルチモーダル添付、生成画像プレビュー、Web Search トグルに対応。
+- **📊 ホストメトリクス & 温度センサー監視**：CPU・メモリ・ロードアベレージ・マルチマウントディスク（`/` および `/mnt/data`）監視と、`/sys/class/hwmon` / `/sys/class/thermal` の重複排除済み温度トレンド。
+- **🔐 統合 Nginx ゲートウェイ & SSO**：`gateway/nginx.conf` による `/grok2api/`、`/chat2api/`（`/gpt2api`）、Dozzle コンテナログ `/logs`、独立 SSH 端末 `/terminal/`・`/kindle-terminal/`、および `/_remote_desktop_auth` / `/api/user/auth/lab-console-sso` を用いた `/guacamole/` SSO。
+- **🖥️ リモートワークスペース、VM 管理 & Virtual iBMC**：ホスト側 `tools/vm-agent`（`new-api-vboxsvc.service` 管理）による VirtualBox 起動/停止/アイドル自動保存（`idle_save_minutes`）、基本コンソール、`win11`/`feiniu` 排他制御・ネットワーク自動復旧（[Network Guard](./tools/vm-agent/NETWORK-GUARD.md)）、Debian/openEuler/eNSP スイッチ接続、および `openEuler` 向け **Virtual iBMC** 訓練シミュレーター（[iBMC ドキュメント](./docs/ibmc-simulator.md)）。
+- **📡 ONT 監視、ホストカメラ & Kindle リモート管理**：Root 専用の Huawei HG8145V5 ONT 監視（AES-GCM 暗号化・30日履歴、[ONT ドキュメント](./docs/ont-monitor.md)）、ホストカメラ/マイク MSE ライブ配信（`tools/host-camera`）、Kindle 画面プレビューと SSH 端末（`scripts/kindle-screen`）。
+- **🛠️ チャネル巡回、自動ビルドクリーンアップ & CI/CD**：Token 期限警告と Session JSON 自動抽出、`chat2api-manager`、Ollama コンテナ統合、全チャネルモデル巡回（`scripts/channel-monitor`）、6時間ごとの古いイメージ/キャッシュ/`/tmp` 自動削除タイマー（`tools/build-cleanup/new-api-build-cleanup.timer`）、および `main` プッシュ時の自動 GHCR リリース（`.github/workflows/dragon-release.yml`）。
 
 ---
 
@@ -151,7 +166,7 @@ docker run --name new-api -d --restart always \
 
 ---
 
-🎉 デプロイが完了したら、`http://localhost:3000` にアクセスして使用を開始してください！
+🎉 デプロイが完了したら、`http://localhost:3000` で Dragon Lab ワークベンチ（`/`）、または `/dashboard` で New API 管理コンソールを開いて使用できます！
 
 > [!WARNING]
 > 本プロジェクトを公衆向け生成 AI サービスまたは API 再販サービスとして運営する場合、ユーザーは届出、コンテンツセキュリティ、本人確認、ログ保持、税務、決済、上流認可などの必要なコンプライアンス義務を先に完了してください。
@@ -189,7 +204,7 @@ docker run --name new-api -d --restart always \
 | 機能 | 説明 |
 |------|------|
 | 🎨 新しいUI | モダンなユーザーインターフェースデザイン |
-| 🌍 多言語 | 簡体字中国語、繁体字中国語、英語、フランス語、日本語をサポート |
+| 🌍 多言語 | 簡体字中国語、繁体字中国語、英語、フランス語、日本語、ロシア語、ベトナム語（7言語）をサポート |
 | 🔄 データ互換性 | オリジナルのOne APIデータベースと完全に互換性あり |
 | 📈 データダッシュボード | ビジュアルコンソールと統計分析 |
 | 🔒 権限管理 | トークングループ化、モデル制限、ユーザー管理 |
@@ -340,6 +355,7 @@ docker run --name new-api -d --restart always \
 | `PYROSCOPE_MUTEX_RATE` | Pyroscope mutexサンプリング率 | `5` |
 | `PYROSCOPE_BLOCK_RATE` | Pyroscope blockサンプリング率 | `5` |
 | `HOSTNAME` | Pyroscope用のホスト名タグ | `new-api` |
+| `VM_AGENT_SOCKET` | カスタムホスト VM Agent の Unix ソケットパス（コンテナ内デフォルト `/run/vm-agent/agent.sock`） | `/run/vm-agent/agent.sock` |
 
 📖 **完全な設定:** [環境変数ドキュメント](https://docs.newapi.pro/ja/docs/installation/config-maintenance/environment-variables)
 

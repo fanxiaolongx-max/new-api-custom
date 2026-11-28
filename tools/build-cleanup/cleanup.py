@@ -29,6 +29,7 @@ DEFAULT_KEEP_IMAGES = 3
 DEFAULT_MIN_IMAGE_AGE_HOURS = 2.0
 DEFAULT_BUILDER_MAX_AGE_HOURS = 72
 DEFAULT_BUILDER_RESERVED_SPACE = "2GB"
+DEFAULT_BUILDER_MAX_SPACE = "4GB"
 DEFAULT_TMP_ROOTS = ("/tmp",)
 DEFAULT_TMP_MAX_AGE_HOURS = 6.0
 DEFAULT_DISK_WARN_PCT = 85
@@ -74,6 +75,7 @@ class CleanupConfig:
     min_image_age_hours: float = DEFAULT_MIN_IMAGE_AGE_HOURS
     builder_max_age_hours: int = DEFAULT_BUILDER_MAX_AGE_HOURS
     builder_reserved_space: str = DEFAULT_BUILDER_RESERVED_SPACE
+    builder_max_space: str = DEFAULT_BUILDER_MAX_SPACE
     prune_dangling: bool = True
     tmp_roots: tuple[str, ...] = DEFAULT_TMP_ROOTS
     tmp_max_age_hours: float = DEFAULT_TMP_MAX_AGE_HOURS
@@ -131,6 +133,9 @@ def config_from_env(dry_run: bool = False) -> CleanupConfig:
     reserved = os.environ.get("BUILD_CLEANUP_BUILDER_RESERVED_SPACE", DEFAULT_BUILDER_RESERVED_SPACE).strip()
     if not reserved:
         reserved = DEFAULT_BUILDER_RESERVED_SPACE
+    max_space = os.environ.get("BUILD_CLEANUP_BUILDER_MAX_SPACE", DEFAULT_BUILDER_MAX_SPACE).strip()
+    if not max_space:
+        max_space = DEFAULT_BUILDER_MAX_SPACE
 
     return CleanupConfig(
         image_repos=_split_csv(os.environ.get("BUILD_CLEANUP_IMAGE_REPOS"), DEFAULT_IMAGE_REPOS),
@@ -138,6 +143,7 @@ def config_from_env(dry_run: bool = False) -> CleanupConfig:
         min_image_age_hours=min_age,
         builder_max_age_hours=builder_age,
         builder_reserved_space=reserved,
+        builder_max_space=max_space,
         prune_dangling=_parse_bool(os.environ.get("BUILD_CLEANUP_PRUNE_DANGLING"), True),
         tmp_roots=_split_csv(os.environ.get("BUILD_CLEANUP_TMP_ROOTS"), DEFAULT_TMP_ROOTS),
         tmp_max_age_hours=tmp_age,
@@ -270,22 +276,33 @@ def select_stale_images(
     return to_remove, to_keep
 
 
-def open_process_fd_targets(proc_root: Path = Path("/proc")) -> set[Path]:
-    """Collect open file/directory paths from `/proc/*/fd` to avoid deleting active artifacts."""
+def open_process_fd_targets(
+    roots: Sequence[str] = DEFAULT_TMP_ROOTS,
+    proc_root: Path = Path("/proc"),
+) -> set[Path]:
+    """Collect open file/directory paths under `roots` from `/proc/*/fd`."""
     targets: set[Path] = set()
     if not proc_root.is_dir():
         return targets
+    resolved_roots = [str(Path(r).resolve(strict=False)) for r in roots]
     for entry in proc_root.iterdir():
         if not entry.name.isdigit():
             continue
         fd_dir = entry / "fd"
         try:
-            for fd in fd_dir.iterdir():
-                try:
-                    resolved = fd.resolve(strict=False)
-                except OSError:
-                    continue
-                targets.add(resolved)
+            with os.scandir(fd_dir) as it:
+                for fd in it:
+                    try:
+                        link_target = os.readlink(fd.path)
+                    except OSError:
+                        continue
+                    if not link_target.startswith("/"):
+                        continue
+                    if any(
+                        link_target == root or link_target.startswith(root.rstrip("/") + "/")
+                        for root in resolved_roots
+                    ):
+                        targets.add(Path(link_target).resolve(strict=False))
         except OSError:
             continue
     return targets
@@ -346,7 +363,7 @@ def find_stale_staging_entries(
     open_targets: set[Path] | None = None,
 ) -> list[tuple[Path, int]]:
     cutoff = now - (max_age_hours * 3600.0)
-    active_fds = open_targets if open_targets is not None else open_process_fd_targets()
+    active_fds = open_targets if open_targets is not None else open_process_fd_targets(roots=roots)
     stale: list[tuple[Path, int]] = []
 
     for root_str in roots:
@@ -477,10 +494,10 @@ def run_cleanup(
         if config.dry_run:
             summary.builder_pruned = (
                 f"dry-run (would run docker builder prune --filter until={config.builder_max_age_hours}h "
-                f"--reserved-space {config.builder_reserved_space})"
+                f"--reserved-space {config.builder_reserved_space} and cap at {config.builder_max_space})"
             )
         else:
-            res = runner([
+            age_res = runner([
                 "docker",
                 "builder",
                 "prune",
@@ -490,10 +507,21 @@ def run_cleanup(
                 "--reserved-space",
                 config.builder_reserved_space,
             ])
-            if res.returncode == 0:
-                summary.builder_pruned = res.stdout.strip() or "ok"
-            else:
-                summary.warnings.append(f"docker builder prune failed: {res.stderr.strip()}")
+            cap_res = runner([
+                "docker",
+                "builder",
+                "prune",
+                "-f",
+                "--filter",
+                f"until={max(1, int(config.min_image_age_hours))}h",
+                "--max-used-space",
+                config.builder_max_space,
+            ])
+            outputs = [r.stdout.strip() for r in (age_res, cap_res) if r.returncode == 0 and r.stdout.strip()]
+            summary.builder_pruned = " | ".join(outputs) if outputs else "ok"
+            for r in (age_res, cap_res):
+                if r.returncode != 0:
+                    summary.warnings.append(f"docker builder prune failed: {r.stderr.strip()}")
 
     stale_paths = find_stale_staging_entries(
         roots=config.tmp_roots,

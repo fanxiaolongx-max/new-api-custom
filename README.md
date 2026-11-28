@@ -83,9 +83,10 @@ Built upon the high-performance architecture of [New API](https://github.com/Qua
 * **Lossless History & Local Timezone Conversion**: High-precision thermal metrics with client-side browser timezone normalization.
 
 ### 🔐 4. Unified Gateway & Multi-Service SSO
-* **Integrated Nginx Gateway**: Production-ready Nginx configuration (`gateway/nginx.conf`) unifying routing and SSL termination on port 3000/80.
+* **Integrated Nginx Gateway**: Production-ready Nginx configuration (`gateway/nginx.conf`) unifying routing and reverse proxying on port 3000/80.
 * **Passwordless Dozzle Container Logs SSO**: Backed by a Redis Session Bridge and Nginx `auth_request /_logs_auth`, administrators seamlessly access container logs at `/logs` via `/api/user/auth/logs-sso` without separate credentials.
-* **Microservice Integration**: Unified root-cookie authentication for `/chat2api/` and `/grok2api/` proxies and dashboards, with native quick links in the New API admin navigation sidebar.
+* **Microservice Integration**: Unified root-cookie authentication for `/chat2api/` (alias `/gpt2api`) and `/grok2api/` (alias `/grok`), paired with `ServicesHubPanel` shortcuts including `Grok2API native management` (`/creative-console`).
+* **Isolated Terminal & Console Auth**: Dedicated routes for `/terminal/` (standalone system-account Guacamole SSH terminal) and `/kindle-terminal/` (Kindle SSH terminal, both guarded by `terminal_login` rate limiting), while `/guacamole/` validates permissions via `/_remote_desktop_auth` (`/api/system/lab/console/auth`) and `/api/user/auth/lab-console-sso` and enables gzip compression for JS/CSS assets.
 
 ### ⏳ 5. Channel Credential Expiry Monitoring & Ops Automation
 * **Access Token Expiry Banner**: The dashboard proactively detects upstream channel token expiration dates, displaying a global alert banner with a one-click quick-update modal.
@@ -95,22 +96,46 @@ Built upon the high-performance architecture of [New API](https://github.com/Qua
 ### 💳 6. Stripe Subscription & Concurrency Hardening
 * **Reliable Settlement**: Hardened Stripe webhook handlers and balance synchronization to prevent race conditions during high-concurrency top-ups.
 
-### 🖥️ 7. Full VM Lifecycle Management & Apache Guacamole Web RDP (VM Management & Web RDP)
-* **Host VM Agent Daemon (`tools/vm-agent`)**: Bridges host VirtualBox and system services over a secure Unix Domain Socket (`/run/vm-agent/agent.sock`), enabling unprivileged, isolated host VM state inspection and operation.
-* **Unified Lifecycle Orchestration**: Integrated `VirtualMachinesPanel` on the overview dashboard monitors power state (running/paused/stopped), guest OS type, CPU/RAM/VRAM allocations, and dedicated RDP ports across all VMs; supports one-click start, graceful ACPI shutdown, hard reset, and state pause.
-* **Clientless Web Remote Desktop (`VirtualMachineConsole`)**: Docker Compose natively integrates Apache Guacamole 1.6.0 (`guacd` + `guacamole`). The gateway layer verifies administrator credentials via `_remote_desktop_auth` for transparent SSO, launching an in-browser Web RDP console with multi-resolution scaling, direct scancode injection, and clipboard synchronization.
-* **Guest Desktop Optimization**: Includes Windows memory guard daemons (`windows-vm-memory-guard`), legacy Windows XP RDP relay proxies (`xp-rdp-relay`), and desktop performance optimization scripts.
+### 🖥️ 7. Remote Workspaces, VM Lifecycle & Host Self-Healing (`Remote workspaces`)
+* **Host VM Agent Daemon (`tools/vm-agent`)**: Bridges host VirtualBox and system services over a restricted Unix Domain Socket (`/run/new-api-vm-agent/agent.sock` on host, `/run/vm-agent/agent.sock` in container), backed by the managed `new-api-vboxsvc.service` unit (`VM_AGENT_REQUIRE_MANAGED_SERVICE=1`), `vm_mouse.py` SDK input subprocess, and serialized command locking (see [VM Agent README](./tools/vm-agent/README.md)).
+* **Unified Lifecycle & Idle Auto-Save**: The overview `Remote workspaces` panel (`VirtualMachinesPanel`) monitors power state, guest OS type, and CPU/RAM across managed VMs; supports start, ACPI shutdown, save state, force power-off, and configurable **Windows inactivity auto-save** (`idle_save_minutes`, 0–1440 min when no RDP/basic-console connection is active).
+* **Dual Web Console Modes**: Docker Compose integrates Apache Guacamole 1.6.0 (`guacd` + `guacamole`, mounting `embedded-console-auth.jar` and `no-browser-side-navigation.jar`) alongside `Basic console mode` (screenshot polling + keyboard/mouse injection).
+* **Companion Locking & Workspace Entries**: Enforces mutual exclusion between `win11` and `feiniu` (fnOS) by saving `feiniu` on Win11 start and resuming afterward, and unifies quick access to Debian desktop, Debian SSH (`mafuli`/`root`), openEuler SSH (`dragon`/`root`), eNSP switches `S5700-LSW1`/`S5700-LSW2`, and dynamically discovered `DragonLab-Node-*` guests.
+* **Network Self-Healing & Guest Optimization**: Includes host and guest systemd timers for fnOS bridge/NIC recovery (`feiniu-network-guard.py` + `feiniu-guest-network-guard.sh`, see [Network Guard](./tools/vm-agent/NETWORK-GUARD.md)), Windows memory guard (`windows-vm-memory-guard`), and legacy XP RDP relay (`xp-rdp-relay`).
 
 ### 🔄 8. Chat2API Token Pool Manager & Smart Routing (Chat2API Manager & Token Pool)
 * **Dedicated Management Microservice**: Features an embedded lightweight `chat2api-manager` service (port 5010) and management dashboard (`/chat2api/manage-api/`), supporting batch imports of Session JSONs, AccessTokens, or RefreshTokens.
 * **Masked Ops & Fault Quarantine**: Displays masked tokens, automatically quarantines faulty tokens with retry capabilities, and utilizes seed-based routing to preserve conversation context.
 
 ### 🦙 9. Ollama Local LLM Container & Model Recommendations (Ollama Container Integration)
-* **Turnkey Local Inference**: Natively orchestrates `ollama/ollama:latest` with dedicated CPU/memory limits to prevent resource contention.
+* **Turnkey Local Inference**: `docker-compose.yml` natively defines `ollama/ollama:latest` with dedicated CPU/memory limits to prevent resource contention (and can be switched to manual profile startup via `docker-compose.override.yml`).
 * **Curated Recommendation Presets**: Bundles cached model recommendation configurations (`model-recommendations.json`) for seamless one-click local deployment of cost-effective open-source models.
 
 ### ⚡ 10. High-Load Process Priority & OOM Hardening (Resource Priority Hardening)
 * **Core Gateway QoS Protection**: Configures elevated CPU scheduling weights (`cpu_shares: 2048`) and reduced OOM score (`oom_score_adj: -800`) for `new-api`, guaranteeing low-latency response even under heavy desktop VM loads or concurrent local LLM inference.
+
+### 🧪 11. Dragon Lab Pre-Deployment Topology Workbench (Home `/`)
+* **Single-Screen Lab Workbench**: The root route `/` now serves the **Dragon Lab (DPI Pre-Deploy)** topology workbench (while the gateway console overview lives at `/dashboard`), presenting five nodes (`Ops PC`, `SW1`, `SW2`, `iBMC`, `TaiShan OS`) with management, traffic, and SOL wiring (see [Dragon Lab docs](./docs/dragon-lab.md)).
+* **Multi-OS Node Switcher & Factory Reset**: Dynamically discovers provisioned OS instances (`Node-01`, `Node-02`, ... via `tools/lab-console/os-nodes/collect.py`), binds nodes and switches to Guacamole consoles and real COM1 `OS serial` tabs, and supports cross-node factory reset (`taishan-lab-reset` + SW1 parking VLANs).
+* **Sandboxed Script Workbench & Control Bridge**: Embeds `TaiSha.html` in a sandboxed iframe (or connects an external workbench URL) via `web/public/dragon-lab-workbench-bridge.js`, providing quick-action execution, task progress reporting, theme syncing, and read-only live terminal feeds (`getTerminalSnapshot` / `subscribeTerminals`, see [terminal feed contract](./docs/dragon-lab-terminal-feed.md)).
+* **Delegated Permissions & Lab Proxies**: Adds `dragon_lab.full` (lab-only admin view and operations) and `dragon_lab.desktop` (Debian desktop shortcut), supported by `ensp-console-proxy.py`, `ibmc-web-console.py`, and `workspace-inventory.py`.
+
+### 🖥️ 12. Virtual iBMC Training Simulator Panel (`Virtual iBMC`)
+* **Application-Level Out-of-Band Simulator**: Accessible via **Remote workspaces → Virtual iBMC** on `/dashboard` (see [iBMC simulator docs](./docs/ibmc-simulator.md)), powered by `tools/vm-agent/ibmc.py` for the `openEuler` VirtualBox guest.
+* **COM1 Serial & Media Controls**: Provides a 115200 8N1 80×24 COM1 serial console (120s exclusive lease, dedicated rate limit, explicit auto-login, and Send Enter), plus power actions, persistent Disk/DVD/PXE boot order, approved local ISO mount/eject, snapshots, JSON diagnostics export, event logs, and simulated locator UID/alarms.
+
+### 📡 13. Huawei HG8145V5 ONT Monitoring Panel (`ONT Monitor`)
+* **Encrypted Collection & 30-Day Retention**: Root-only `ONTMonitorPanel` (`/api/system/ont*`, see [ONT monitor docs](./docs/ont-monitor.md)) stores credentials with AES-GCM encryption in the database and collects metrics on the primary node with 30-day history retention.
+* **Optical Curves, Traffic & Event Timeline**: Visualizes 1h–30d optical power charts, observed WAN state, searchable localized WAN/Ethernet/WLAN/LAN/optics parameters, 64-bit byte counters/rate estimates, and an event timeline (WAN IP changes, link transitions, ≥3 dB optical shifts).
+
+### 📷 14. Host Camera Stream & Kindle Remote Screen / Terminal
+* **Host Camera & Microphone Live Stream (`HostCameraPanel`)**: Root users see a live host feed in the overview cards, streamed as fragmented MP4 from `tools/host-camera/agent.py` ([README](./tools/host-camera/README.md)) over `/run/vm-agent/camera.sock` and `/api/system/camera/stream` into browser MSE playback.
+* **Kindle Remote Screen & SSH Terminal**: `scripts/kindle-screen/agent.py` ([README](./scripts/kindle-screen/README.md)) captures framebuffer screenshots via a restricted SSH `fbgrab` key over `/run/vm-agent/kindle-screen.sock` for 10s-polled root preview (`/api/system/kindle/screen`), alongside a dedicated Guacamole SSH container routed at `/kindle-terminal/`.
+
+### 🛠️ 15. Channel Model Monitor, Automated Build Cleanup & CI/CD Releases
+* **All-Channel Model Monitor (`scripts/channel-monitor/monitor.py`)**: Uses an administrator PAT to test every configured model across enabled and disabled channels and outputs sanitized JSON health reports (see [Channel Monitor README](./scripts/channel-monitor/README.md)).
+* **Automated Build History Cleanup (`tools/build-cleanup/cleanup.py`)**: Runs on demand (`--dry-run`) or periodically every 6 hours via `new-api-build-cleanup.timer`, pruning stale `new-api-custom:*` image tags (preserving container-in-use images, the newest 3 tags, and builds <2h old), dangling images, old BuildKit cache (>72h, capped at 4GB), and expired `/tmp` staging artifacts while monitoring disk utilization (see [Build Cleanup README](./tools/build-cleanup/README.md)).
+* **Versioned GHCR Releases (`.github/workflows/dragon-release.yml`)**: Automatically increments patch tags on pushes to `main`, builds and pushes `ghcr.io/<repo>:<version>` and `:latest`, and creates a GitHub Release with change notes.
 
 
 ---
@@ -187,14 +212,16 @@ bash deploy.sh
 | **redis** | `redis:alpine` | Distributed cache, rate limiter, and centralized session bridge | Internal `6379` |
 | **chat2api** | `lanqian528/chat2api` | ChatGPT upstream proxy service | `/chat2api/` |
 | **chat2api-manager** | `lanqian528/chat2api` | Chat2API token pool manager and health monitoring service | `/chat2api/manage-api/` |
-| **grok2api** | `ghcr.io/chenyme/grok2api` | Grok upstream proxy service and web dashboard | `/grok2api/` |
+| **grok2api** | `ghcr.io/chenyme/grok2api:v3.1.5` | Grok upstream proxy service and web dashboard | `/grok2api/`, `/grok` |
 | **ollama** | `ollama/ollama:latest` | Local lightweight LLM inference engine | Internal `11434` |
 | **guacd** | `guacamole/guacd:1.6.0` | Apache Guacamole remote desktop proxy daemon | Internal `4822` |
-| **guacamole** | `guacamole/guacamole:1.6.0` | Apache Guacamole web client with SSO passthrough | `/guacamole/` |
-| **dozzle** | `amir20/dozzle` | Real-time container log viewer (protected by `/_logs_auth` SSO) | `/logs` |
+| **guacamole** | `guacamole/guacamole:1.6.0` | Apache Guacamole web client (with `embedded-console-auth.jar` & `no-browser-side-navigation.jar`) | `/guacamole/` |
+| **dozzle** | `amir20/dozzle:v10.6.14` | Real-time container log viewer (protected by `/_logs_auth` SSO) | `/logs` |
+| **Extra terminals (optional)** | `guacamole/guacamole:1.6.0` | Standalone system-account and Kindle SSH web terminals (see `gateway/nginx.conf` and `scripts/kindle-screen/compose.yaml`) | `/terminal/`, `/kindle-terminal/` |
 
-> **💡 Host Telemetry Mounts:**
-> `docker-compose.yml` mounts host paths in read-only mode (`/mnt/data:/mnt/data:ro`, `/sys/class/hwmon:/sys/class/hwmon:ro`, and `/sys/class/thermal:/sys/class/thermal:ro`), allowing non-intrusive collection of host disk capacity and thermal sensor metrics. Adjust mount paths in `docker-compose.yml` if your storage partitions differ.
+> **💡 Host Mounts, Socket Agents & Maintenance:**
+> - `docker-compose.yml` mounts host paths read-only (`/mnt/data:/mnt/data:ro`, `/sys/class/hwmon:/sys/class/hwmon:ro`, `/sys/class/thermal:/sys/class/thermal:ro`) for disk/thermal telemetry, and mounts `/run/new-api-vm-agent:/run/vm-agent` to communicate with host `vm-agent`, `host-camera`, and `kindle-screen` sockets.
+> - When building images frequently on the host, enable `tools/build-cleanup/new-api-build-cleanup.timer` to periodically prune stale image tags, build cache, and `/tmp` staging artifacts (see [Build Cleanup README](./tools/build-cleanup/README.md)).
 
 </details>
 
@@ -241,7 +268,7 @@ docker run --name new-api -d --restart always \
 
 ---
 
-🎉 After deployment is complete, visit `http://localhost:3000` to start using!
+🎉 After deployment is complete, visit `http://localhost:3000` for the Dragon Lab workbench (`/`), or `/dashboard` for the New API console overview!
 
 > [!WARNING]
 > When operating this project as a public generative AI service or API resale service, users should first complete all required filing, licensing, content safety, real-name verification, log retention, tax, payment, and upstream authorization obligations.
@@ -279,7 +306,7 @@ docker run --name new-api -d --restart always \
 | Feature | Description |
 |------|------|
 | 🎨 New UI | Modern user interface design |
-| 🌍 Multi-language | Supports Simplified Chinese, Traditional Chinese, English, French, Japanese |
+| 🌍 Multi-language | Supports Simplified Chinese, Traditional Chinese, English, French, Japanese, Russian, Vietnamese (7 locales) |
 | 🔄 Data Compatibility | Fully compatible with the original One API database |
 | 📈 Data Dashboard | Visual console and statistical analysis |
 | 🔒 Permission Management | Token grouping, model restrictions, user management |
@@ -429,6 +456,7 @@ docker run --name new-api -d --restart always \
 | `PYROSCOPE_MUTEX_RATE` | Pyroscope mutex sampling rate | `5` |
 | `PYROSCOPE_BLOCK_RATE` | Pyroscope block sampling rate | `5` |
 | `HOSTNAME` | Hostname tag for Pyroscope | `new-api` |
+| `VM_AGENT_SOCKET` | Unix socket path for the customized host VM agent (container default `/run/vm-agent/agent.sock`) | `/run/vm-agent/agent.sock` |
 
 📖 **Complete configuration:** [Environment Variables Documentation](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
 

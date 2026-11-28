@@ -10,8 +10,10 @@ expired Docker BuildKit cache, and leftover temporary staging directories/logs.
   repository plus any image created within `BUILD_CLEANUP_MIN_IMAGE_AGE_HOURS`
   (default `2` hours).
 - Prunes BuildKit cache older than `BUILD_CLEANUP_BUILDER_MAX_AGE_HOURS`
-  (default `72` hours) while reserving `BUILD_CLEANUP_BUILDER_RESERVED_SPACE`
-  (default `2GB`) for incremental rebuilds.
+  (default `72` hours, reserving `BUILD_CLEANUP_BUILDER_RESERVED_SPACE`, default
+  `2GB`) and caps BuildKit cache older than `BUILD_CLEANUP_MIN_IMAGE_AGE_HOURS`
+  at `BUILD_CLEANUP_BUILDER_MAX_SPACE` (default `4GB`) so incremental rebuilds
+  stay fast without unbounded growth.
 - Only removes temporary staging entries matching explicit build patterns whose
   entire tree is older than `BUILD_CLEANUP_TMP_MAX_AGE_HOURS` (default `6` hours),
   and skips lockfiles, sockets, git worktrees, and files held open by any process.

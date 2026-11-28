@@ -34,9 +34,8 @@ class BuildCleanupTests(unittest.TestCase):
     def test_select_stale_images_protects_active_newest_and_recent(self):
         now = 1_800_000_000.0
         records = [
-            cleanup.DockerImageRecord("new-api-custom", "newest-1", "sha256:111", now - 36000),
-            cleanup.DockerImageRecord("new-api-custom", "newest-2", "sha256:222", now - 40000),
             cleanup.DockerImageRecord("new-api-custom", "recent-brand-new", "sha256:333", now - 1800),
+            cleanup.DockerImageRecord("new-api-custom", "newest-2", "sha256:222", now - 36000),
             cleanup.DockerImageRecord("new-api-custom", "old-active", "sha256:444", now - 200000),
             cleanup.DockerImageRecord("new-api-custom", "old-shared-tag", "sha256:222", now - 200000),
             cleanup.DockerImageRecord("new-api-custom", "old-stale-a", "sha256:555", now - 90000),
@@ -52,8 +51,26 @@ class BuildCleanupTests(unittest.TestCase):
         self.assertEqual([r.tag for r in to_remove], ["old-stale-a", "old-stale-b"])
         self.assertEqual(
             [r.tag for r in to_keep],
-            ["recent-brand-new", "newest-1", "newest-2", "old-active", "old-shared-tag"],
+            ["recent-brand-new", "newest-2", "old-shared-tag", "old-active"],
         )
+
+    def test_select_stale_images_protects_recent_even_beyond_keep_count(self):
+        now = 1_800_000_000.0
+        records = [
+            cleanup.DockerImageRecord("new-api-custom", "r1", "sha256:1", now - 600),
+            cleanup.DockerImageRecord("new-api-custom", "r2", "sha256:2", now - 1200),
+            cleanup.DockerImageRecord("new-api-custom", "r3", "sha256:3", now - 1800),
+            cleanup.DockerImageRecord("new-api-custom", "old", "sha256:4", now - 20000),
+        ]
+        to_remove, to_keep = cleanup.select_stale_images(
+            records=records,
+            active_image_ids=set(),
+            keep_images=1,
+            min_age_hours=2.0,
+            now=now,
+        )
+        self.assertEqual([r.tag for r in to_remove], ["old"])
+        self.assertEqual([r.tag for r in to_keep], ["r1", "r2", "r3"])
 
     def test_find_stale_staging_entries_respects_age_locks_worktree_and_open_fds(self):
         now = 1_800_000_000.0
@@ -108,7 +125,7 @@ class BuildCleanupTests(unittest.TestCase):
         self.assertEqual([(p.name, sz) for p, sz in stale], [("dragonapi-old-image", 6)])
 
     def test_run_cleanup_dry_run_does_not_delete_images_or_files(self):
-        now = 1_800_000_000.0
+        now = 1_795_800_000.0 + 360000
         old_mtime = now - (10 * 3600)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -169,9 +186,9 @@ class BuildCleanupTests(unittest.TestCase):
                 tmp_max_age_hours=6.0,
                 dry_run=True,
             )
-            summary = cleanup.run_cleanup(cfg, runner=runner, now=1_795_800_000.0 + 360000, open_targets=set())
-            # Wait: 2026-11-27 in epoch is ~1795773600; check with fixed timestamp so v1 is old.
+            summary = cleanup.run_cleanup(cfg, runner=runner, now=now, open_targets=set())
             self.assertTrue(staging.exists())
+            self.assertEqual(summary.removed_images, ["new-api-custom:v1"])
             self.assertEqual(summary.removed_staging, [str(staging)])
             self.assertFalse(any(cmd[:3] == ("docker", "image", "rm") for cmd in runner.calls))
 
@@ -242,6 +259,10 @@ class BuildCleanupTests(unittest.TestCase):
             self.assertEqual(summary.reclaimed_staging_bytes, 8)
             self.assertFalse(staging.exists())
             self.assertIn(("docker", "image", "rm", "new-api-custom:v1"), runner.calls)
+            self.assertIn(
+                ("docker", "builder", "prune", "-f", "--filter", "until=2h", "--max-used-space", "4GB"),
+                runner.calls,
+            )
 
 
 if __name__ == "__main__":

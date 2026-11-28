@@ -43,6 +43,7 @@
 </p>
 
 <p align="center">
+  <a href="#-定製增強特性">定製特性</a> •
   <a href="#-快速開始">快速開始</a> •
   <a href="#-主要特性">主要特性</a> •
   <a href="#-部署">部署</a> •
@@ -59,6 +60,20 @@
 > - 使用者必須合法取得上游 API Key、帳號、模型服務或介面權限，並遵守上游服務條款及適用法律法規。
 > - 使用者應確保其使用方式符合上游服務條款及適用法律法規。
 > - 面向公眾提供生成式人工智慧服務時，使用者應遵守[《生成式人工智慧服務管理暫行辦法》](http://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm)等監管要求，自行完成所在司法轄區要求的備案、許可、內容安全、實名、日誌留存、稅務和上游授權等合規義務。
+
+---
+
+## 🌟 定製增強特性
+
+本專案在開源 [New API](https://github.com/QuantumNous/new-api) 架構基礎上，新增了多項企業級維運自動化、硬體監控與實驗室工作台能力（詳見 [簡體中文完整說明](./README.zh_CN.md) 與 [English README](./README.md)）：
+
+- **🧪 Dragon Lab 拓樸演練工作台（首頁 `/`）**：單屏自適應五節點拓樸（`維運 PC`、`SW1`、`SW2`、`iBMC`、`TaiShan OS`），支援多 OS 節點切換、Guacamole 遠端桌面/串口、隔離腳本工作台與實況終端流（[Dragon Lab 文件](./docs/dragon-lab.md)）、全節點恢復出廠以及 `dragon_lab.full` / `dragon_lab.desktop` 精細權限。
+- **🥊 多模型串流競技場**：Playground 支援 2~4 模型平行串流對比、供應商分組切換、多模態附件上傳、AI 繪圖預覽與 Web Search 獨立開關。
+- **📊 主機效能、多磁碟與硬體熱感測器監控**：即時監測 CPU/記憶體/系統負載、`/` 與 `/mnt/data` 等多掛載點磁碟容量，以及 `/sys/class/hwmon`、`/sys/class/thermal` 去重溫度趨勢。
+- **🔐 Nginx 統一閘道與 SSO**：整合 `/grok2api/`、`/chat2api/`（別名 `/gpt2api`）、Dozzle 即時日誌 `/logs`、獨立 SSH 終端 `/terminal/` 與 `/kindle-terminal/`，以及 `/guacamole/` 按權限驗證的免密單點登入。
+- **🖥️ 遠端工作區、虛擬機生命週期與虛擬 iBMC**：透過宿主機 `tools/vm-agent`（搭配託管 `new-api-vboxsvc.service`）管理 VirtualBox 虛機開關機、休眠/空閒自動儲存（`idle_save_minutes`）、基礎控制台、Win11/fnOS 互斥聯動與網路自癒守衛（[網路守衛文件](./tools/vm-agent/NETWORK-GUARD.md)），並為 `openEuler` 提供 **Virtual iBMC** COM1 串口與開機順序／ISO／快照訓練模擬器（[iBMC 文件](./docs/ibmc-simulator.md)）。
+- **📡 光貓監控、宿主機攝影機與 Kindle 遠端控制**：Root 專用的華為 HG8145V5 光貓監控（[ONT 文件](./docs/ont-monitor.md)）、宿主機攝影機與麥克風即時 MSE 串流（[攝影機文件](./tools/host-camera/README.md)），以及 Kindle 遠端螢幕預覽與 SSH 終端（[Kindle 文件](./scripts/kindle-screen/README.md)）。
+- **🛠️ 管道自動化與 CI/CD 維護**：支援 Token 到期橫幅與 Session JSON 解析、Chat2API 帳號池管理器（`chat2api-manager`）、Ollama 容器整合、全管道模型巡檢腳本（[巡檢文件](./scripts/channel-monitor/README.md)）、每 6 小時自動清理過舊鏡像/快取/`/tmp` 暫存的 `tools/build-cleanup` 定時任務（[清理文件](./tools/build-cleanup/README.md)），以及推送 `main` 自動發布版本化 GHCR 鏡像的 GitHub Actions 流程（`.github/workflows/dragon-release.yml`）。
 
 ---
 
@@ -150,7 +165,7 @@ docker run --name new-api -d --restart always \
 
 ---
 
-🎉 部署完成後，訪問 `http://localhost:3000` 即可使用！
+🎉 部署完成後，造訪 `http://localhost:3000` 進入 Dragon Lab 工作台（`/`），或造訪 `/dashboard` 開啟 New API 主控台概覽！
 
 > [!WARNING]
 > 將本專案作為面向公眾的生成式 AI 服務或 API 轉售服務運營時，使用者應先完成備案、內容安全、實名、日誌留存、稅務、支付和上游授權等合規義務。
@@ -188,7 +203,7 @@ docker run --name new-api -d --restart always \
 | 特性 | 說明 |
 |------|------|
 | 🎨 全新 UI | 現代化的用戶界面設計 |
-| 🌍 多語言 | 支援簡體中文、繁體中文、英文、法語、日語 |
+| 🌍 多語言 | 支援簡體中文、繁體中文、英語、法語、日語、俄語、越南語（7 種語言） |
 | 🔄 數據兼容 | 完全兼容原版 One API 資料庫 |
 | 📈 數據看板 | 視覺化控制檯與統計分析 |
 | 🔒 權限管理 | 令牌分組、模型限制、用戶管理 |
@@ -336,7 +351,8 @@ docker run --name new-api -d --restart always \
 | `PYROSCOPE_BASIC_AUTH_PASSWORD` | Pyroscope Basic Auth 密碼                  | - |
 | `PYROSCOPE_MUTEX_RATE` | Pyroscope mutex 採樣率                               | `5` |
 | `PYROSCOPE_BLOCK_RATE` | Pyroscope block 採樣率                               | `5` |
-| `HOSTNAME` | Pyroscope 標籤裡的主機名                                          | `new-api` |
+| `HOSTNAME` | Pyroscope 標籤裡的主機名 | `new-api` |
+| `VM_AGENT_SOCKET` | 定製宿主機 VM Agent 的 Unix Socket 路徑（容器內預設 `/run/vm-agent/agent.sock`） | `/run/vm-agent/agent.sock` |
 
 📖 **完整配置：** [環境變數文件](https://docs.newapi.pro/zh/docs/installation/config-maintenance/environment-variables)
 

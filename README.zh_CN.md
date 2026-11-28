@@ -85,7 +85,8 @@
 ### 🔐 4. Nginx 统一网关与微服务免密单点登录 (SSO)
 * **一体化反代网关**：内置生产级 Nginx 网关配置（`gateway/nginx.conf`），统一对外暴露服务端口并实现流量收敛。
 * **Dozzle 实时日志免密 SSO**：基于 Redis Session Bridge 与 Nginx `auth_request /_logs_auth` 机制，管理人员访问 `/logs` 查看容器实时日志时自动验证 New API 管理员身份（`/api/user/auth/logs-sso`），非管理员或未登录自动拦截。
-* **多微服务无缝挂载**：统一根 Cookie 鉴权下无缝集成 `/chat2api/` 与 `/grok2api/` 转接服务及可视化独立控制台，New API 侧边栏与仪表盘原生内置快捷导航。
+* **多微服务无缝挂载**：统一根 Cookie 鉴权下无缝集成 `/chat2api/`（别名 `/gpt2api`）、`/grok2api/`（别名 `/grok`）转接服务及 `ServicesHubPanel` 快捷导航（含 `Grok2API native management` `/creative-console`）。
+* **终端与桌面会话认证隔离**：新增 `/terminal/`（独立系统账号 Guacamole SSH 终端）与 `/kindle-terminal/`（Kindle 专用终端，含 `terminal_login` 登录限流）；`/guacamole/` 接入 `/_remote_desktop_auth`（`/api/system/lab/console/auth`）与 `/api/user/auth/lab-console-sso` 进行按权限的会话校验与过期提示，并对 JS/CSS 静态资源开启 gzip 压缩。
 
 ### ⏳ 5. 渠道凭据到期监控与便捷维护 (Channel Expiry & Ops)
 * **Token 到期预警横幅**：控制台首页自动探测渠道 Access Token 到期时间，针对临期或过期凭据弹出全局醒目提醒横幅，并支持一键弹窗快捷更新。
@@ -95,22 +96,46 @@
 ### 💳 6. Stripe 订阅支付回调与安全加固
 * **并发结算加固**：重构并加固 Stripe 订阅支付回调链路，优化充值金额清空逻辑与并发状态结算，防止高并发回调下的数据不一致。
 
-### 🖥️ 7. 虚拟机全生命周期运维与 Apache Guacamole Web 远程桌面 (VM Management & Web RDP)
-* **宿主机 VM 智能代理 (`tools/vm-agent`)**：基于安全的 Unix Domain Socket (`/run/vm-agent/agent.sock`) 桥接宿主机 VirtualBox 与系统服务，以无特权隔离架构实现虚机状态探测与操作。
-* **全生命周期统一管控**：概览页原生集成 `VirtualMachinesPanel` 卡片，实时监控物理主机上所有虚拟机的开机/运行/暂停状态、操作系统类型、CPU/内存/显存分配与独立 RDP 端口；支持一键开机、优雅关机、强制重置与状态保存。
-* **免客户端 Web 远程桌面 (`VirtualMachineConsole`)**：容器编排深度整合 Apache Guacamole 1.6.0 (`guacd` + `guacamole`)，网关层通过 `_remote_desktop_auth` 校验管理员身份并实现无感 SSO，控制台可直接弹窗打开流畅的浏览器 Web RDP 桌面，支持多分辨率自适应、键盘扫描码直投与剪贴板同步。
-* **桌面环境专属优化与守护**：配套 Windows 内存压缩与清理守护脚本 (`windows-vm-memory-guard`)、XP RDP 协议中继服务 (`xp-rdp-relay`) 以及系统精简优化脚本。
+### 🖥️ 7. 远程工作区、虚拟机生命周期与宿主机自愈守护 (Remote Workspaces & VM Ops)
+* **宿主机 VM 智能代理 (`tools/vm-agent`)**：基于受限 Unix Domain Socket（宿主机 `/run/new-api-vm-agent/agent.sock`，容器内 `/run/vm-agent/agent.sock`）桥接宿主机 VirtualBox 与系统服务；配套托管守护 `new-api-vboxsvc.service`（`VM_AGENT_REQUIRE_MANAGED_SERVICE=1`）与 `vm_mouse.py` 独立 SDK 输入进程，通过单锁序列化 `VBoxManage` 与控制台输入以降低并发调用风险（详见 [VM Agent 文档](./tools/vm-agent/README.md)）。
+* **全生命周期管控与空闲自动保存**：概览页 `Remote workspaces`（`VirtualMachinesPanel`）实时展示所有托管虚机状态、CPU/内存与系统类型，支持开机、优雅关机、保存状态、强制断电，并提供 **Windows 虚机空闲自动保存超时**（`idle_save_minutes`，0–1440 分钟，无 RDP/基础控制台活动后自动保存）。
+* **双模式 Web 远程控制**：容器编排深度整合 Apache Guacamole 1.6.0（`guacd` + `guacamole`，挂载 `embedded-console-auth.jar` 与 `no-browser-side-navigation.jar`），同时保留基于截图与键鼠注入的 `Basic console mode`（基础控制台模式）。
+* **互斥联动与工作区统一入口**：支持 `win11` 与 `feiniu`（fnOS）自动互斥（启动 `win11` 时自动保存 `feiniu`，停止后恢复），同一面板还整合了 Debian 桌面、Debian SSH（`mafuli`/`root` 账号切换）、openEuler SSH（`dragon`/`root` 账号切换）、`S5700-LSW1`/`S5700-LSW2` 交换机 Telnet 控制台与动态发现的 `DragonLab-Node-*` 实验节点。
+* **网络自愈与桌面优化**：配套宿主机与 Guest 双端 fnOS 网络自愈定时器（`feiniu-network-guard.py` + `feiniu-guest-network-guard.sh`，支持有线/无线桥接自动切换，详见 [网络守卫文档](./tools/vm-agent/NETWORK-GUARD.md)），以及 Windows 内存清理守护（`windows-vm-memory-guard`）与 XP RDP 中继（`xp-rdp-relay`）。
 
 ### 🔄 8. Chat2API 账号池管理与智能分发 (Chat2API Manager & Token Pool)
 * **轻量级管理微服务**：内置独立 `chat2api-manager` 服务（端口 5010）与嵌入式管理面板 (`/chat2api/manage-api/`)，支持批量上传 Session JSON、AccessToken 或 RefreshToken。
 * **脱敏运维与故障自愈**：支持 Token 脱敏安全显示、异常 Token 自动隔离警告、健康检查与一键重新激活，配合会话 Seed 路由保障用户对话上下文粘性。
 
 ### 🦙 9. Ollama 本地模型容器与智能推荐 (Ollama Container Integration)
-* **一站式本地大模型服务**：容器编排原生整合 `ollama/ollama:latest`，配置 CPU / 内存硬限额防止与上层网关争抢系统资源。
+* **一站式本地大模型服务**：`docker-compose.yml` 原生编排 `ollama/ollama:latest`，配置 CPU / 内存硬限额防止与上层网关争抢系统资源（本地部署亦可通过 `docker-compose.override.yml` 的 profile 按需启停）。
 * **精选模型推荐配置**：预置大模型推荐清单缓存 (`model-recommendations.json`)，支持一键部署并接入本地高性价比开源模型。
 
 ### ⚡ 10. 高负载进程优先级与 OOM 调度加固 (Resource Priority Hardening)
 * **核心网关优先级保护**：为核心 `new-api` 服务赋予更高 CPU 调度权重（`cpu_shares: 2048`）及降级 OOM 杀死倾向（`oom_score_adj: -800`），在宿主机运行高算力桌面虚拟机或大模型推理时，确保 API 网关始终稳定低延迟响应。
+
+### 🧪 11. Dragon Lab 部署演练拓扑工作台（首页 `/`）
+* **单屏拓扑工作台**：首页 `/` 已升级为 **Dragon Lab (DPI Pre-Deploy)** 演练工作台（原系统概览移至 `/dashboard`），集中展示 `运维 PC`、`SW1`、`SW2`、`iBMC`、`TaiShan OS` 五节点以及管理/业务/SOL 链路映射与实时状态（详见 [Dragon Lab 文档](./docs/dragon-lab.md)）。
+* **多 OS 节点切换与一键重置**：内置节点切换器（`Node-01`、`Node-02` 等，由 `tools/lab-console/os-nodes/collect.py` 动态采集）和全节点出厂状态恢复（`taishan-lab-reset` + SW1 停泊 VLAN 恢复）；支持将多个节点或交换机绑定到受权 Guacamole 控制台及真实 COM1 `OS 串口` 标签。
+* **隔离脚本工作台与控制桥**：支持内置 `TaiSha.html` 与受信任外部工作台 URL，借助 `web/public/dragon-lab-workbench-bridge.js` 实现快捷操作、任务进度回传、亮暗主题同步与只读执行实况终端流（`getTerminalSnapshot` / `subscribeTerminals`，见 [实况接口约定](./docs/dragon-lab-terminal-feed.md)）。
+* **细粒度委托授权与辅助代理**：提供 `dragon_lab.full`（实验室完整读写与重置权限，非 Root 用户登录后直达 `/`）和 `dragon_lab.desktop`（Debian 桌面入口权限），并配套 `ensp-console-proxy.py`、`ibmc-web-console.py` 与 `workspace-inventory.py`。
+
+### 🖥️ 12. 虚拟 iBMC 训练模拟器面板 (`Virtual iBMC`)
+* **应用级带外管理训练**：位于 `/dashboard` 的 **Remote workspaces → Virtual iBMC**（见 [iBMC 模拟器文档](./docs/ibmc-simulator.md)），通过 `tools/vm-agent/ibmc.py` 对 `openEuler` VirtualBox 虚机提供真串口交互与生命周期演练。
+* **COM1 串口与介质管理**：支持 115200 8N1 80×24 串口控制台（120 秒独占租约、独立限流、显式自动登录与“发送回车”），以及电源控制、Disk/DVD/PXE 启动顺序切换、受控本地 ISO 镜像挂载/弹出、快照创建、JSON 诊断导出、事件记录和模拟 UID/告警状态。
+
+### 📡 13. 华为 HG8145V5 光猫监控面板 (`ONT Monitor`)
+* **加密采集与长周期留存**：面向 Root 管理员开放的 `ONTMonitorPanel`（`/api/system/ont*`，见 [ONT 监控文档](./docs/ont-monitor.md)），使用 AES-GCM 加密存储路由器地址与凭据，主节点后台周期轮询并留存 30 天历史数据。
+* **光功率、流量与事件时间线**：支持 1 小时至 30 天光功率历史曲线、WAN 联网状态、以太网/WLAN/LAN 主机/光模块参数检索与中英文对照、64 位字节流量计数与速率估算，以及 IP 变更/链路切换/光功率波动（≥3 dB）事件时间线。
+
+### 📷 14. 宿主机音视频监控与 Kindle 远程管理
+* **宿主机摄像头与麦克风实时流 (`HostCameraPanel`)**：Root 管理员在概览页可查看宿主机实时音视频流，由宿主机 `tools/host-camera/agent.py`（[文档](./tools/host-camera/README.md)）调用 `ffmpeg` 经 `/run/vm-agent/camera.sock` 与 `/api/system/camera/stream` 推送 fragmented MP4 至浏览器 MSE 播放。
+* **Kindle 远程屏幕预览与 SSH 终端**：宿主机 `scripts/kindle-screen/agent.py`（[文档](./scripts/kindle-screen/README.md)）通过受限 SSH 密钥调用 `fbgrab` 截屏并经 `/run/vm-agent/kindle-screen.sock` 向 `/api/system/kindle/screen` 实时回传画面（10 秒轮询），同时配套独立 Guacamole 终端容器与 `/kindle-terminal/` 网关路由。
+
+### 🛠️ 15. 全渠道巡检、自动构建历史清理与 CI/CD 发布
+* **全渠道模型巡检 (`scripts/channel-monitor/monitor.py`)**：使用管理员 PAT 遍历全部启用/禁用渠道的所有模型调用单模型检测接口，生成脱敏健康报告（见 [巡检文档](./scripts/channel-monitor/README.md)）。
+* **自动构建历史清理 (`tools/build-cleanup/cleanup.py`)**：支持命令行 `--dry-run` 与 `systemd` 定时守护（`new-api-build-cleanup.timer`，每 6 小时运行），自动清理超出保留策略的 `new-api-custom:*` 历史镜像（默认保护容器在用镜像、最新 3 个标签及 2 小时内新镜像）、悬空镜像、超期 BuildKit 缓存（72 小时以上并设置 4GB 上限）以及 `/tmp` 过期构建暂存文件，并监控系统盘与 Docker 磁盘水位（见 [清理文档](./tools/build-cleanup/README.md)）。
+* **自动版本化发布 (`.github/workflows/dragon-release.yml`)**：每次推送 `main`（非纯文档变更）自动递增 patch 版本标签、构建并推送 `ghcr.io/<repo>:<version>` 与 `:latest` 镜像并生成 GitHub Release。
 
 
 ---
@@ -187,14 +212,16 @@ bash deploy.sh
 | **redis** | `redis:alpine` | 分布式缓存与 Session 状态管理，支持多实例即时收敛 | 内部 `6379` |
 | **chat2api** | `lanqian528/chat2api` | ChatGPT 接口转接服务 | `/chat2api/` |
 | **chat2api-manager** | `lanqian528/chat2api` | Chat2API 账号池管理与健康维护微服务 | `/chat2api/manage-api/` |
-| **grok2api** | `ghcr.io/chenyme/grok2api` | Grok 接口转接服务与独立管理控制台 | `/grok2api/` |
+| **grok2api** | `ghcr.io/chenyme/grok2api:v3.1.5` | Grok 接口转接服务与独立管理控制台 | `/grok2api/`、`/grok` |
 | **ollama** | `ollama/ollama:latest` | 本地轻量开源大模型推理引擎 | 内部 `11434` |
 | **guacd** | `guacamole/guacd:1.6.0` | Apache Guacamole 远程桌面代理守护进程 | 内部 `4822` |
-| **guacamole** | `guacamole/guacamole:1.6.0` | Apache Guacamole Web 客户端，支持 SSO 免密透传 | `/guacamole/` |
-| **dozzle** | `amir20/dozzle` | 容器实时日志查看器（由 `/_logs_auth` 提供免密单点登录保护） | `/logs` |
+| **guacamole** | `guacamole/guacamole:1.6.0` | Apache Guacamole Web 客户端（加载 `embedded-console-auth.jar` 与 `no-browser-side-navigation.jar`） | `/guacamole/` |
+| **dozzle** | `amir20/dozzle:v10.6.14` | 容器实时日志查看器（由 `/_logs_auth` 提供免密单点登录保护） | `/logs` |
+| **扩展终端（可选）** | `guacamole/guacamole:1.6.0` | 独立系统账号与 Kindle 专用 SSH Web 终端（见 `gateway/nginx.conf` 与 `scripts/kindle-screen/compose.yaml`） | `/terminal/`、`/kindle-terminal/` |
 
-> **💡 磁盘与硬件监控说明：**
-> `docker-compose.yml` 中默认通过只读挂载了宿主机的 `/mnt/data:/mnt/data:ro`、`/sys/class/hwmon:/sys/class/hwmon:ro` 和 `/sys/class/thermal:/sys/class/thermal:ro`，以无侵入方式采集物理机温度与多磁盘空间。若您的服务器挂载路径不同，可在 `docker-compose.yml` 中调整对应挂载点。
+> **💡 宿主机挂载、Socket 代理与日常维护：**
+> - `docker-compose.yml` 默认通过只读挂载宿主机的 `/mnt/data:/mnt/data:ro`、`/sys/class/hwmon:/sys/class/hwmon:ro` 和 `/sys/class/thermal:/sys/class/thermal:ro`，无侵入采集物理机温度与多磁盘空间；同时挂载 `/run/new-api-vm-agent:/run/vm-agent` 与宿主机 `vm-agent`、摄像头及 Kindle 屏幕代理通信。
+> - 若高频本地构建镜像，建议启用 `tools/build-cleanup/new-api-build-cleanup.timer` 自动清理过期镜像与构建缓存，详见 [自动构建历史清理文档](./tools/build-cleanup/README.md)。
 
 </details>
 
@@ -241,7 +268,7 @@ docker run --name new-api -d --restart always \
 
 ---
 
-🎉 部署完成后，访问 `http://localhost:3000` 即可使用！
+🎉 部署完成后，访问 `http://localhost:3000` 进入 Dragon Lab 工作台（`/`），或访问 `/dashboard` 打开 New API 控制台概览！
 
 > [!WARNING]
 > 将本项目作为面向公众的生成式 AI 服务或 API 转售服务运营时，使用者应先完成备案、内容安全、实名、日志留存、税务、支付和上游授权等合规义务。
@@ -279,7 +306,7 @@ docker run --name new-api -d --restart always \
 | 特性 | 说明 |
 |------|------|
 | 🎨 全新 UI | 现代化的用户界面设计 |
-| 🌍 多语言 | 支持中文、英文、法语、日语 |
+| 🌍 多语言 | 支持简体中文、繁体中文、英语、法语、日语、俄语、越南语（7 种语言） |
 | 🔄 数据兼容 | 完全兼容原版 One API 数据库 |
 | 📈 数据看板 | 可视化控制台与统计分析 |
 | 🔒 权限管理 | 令牌分组、模型限制、用户管理 |
@@ -427,7 +454,8 @@ docker run --name new-api -d --restart always \
 | `PYROSCOPE_BASIC_AUTH_PASSWORD` | Pyroscope Basic Auth 密码                  | - |
 | `PYROSCOPE_MUTEX_RATE` | Pyroscope mutex 采样率                               | `5` |
 | `PYROSCOPE_BLOCK_RATE` | Pyroscope block 采样率                               | `5` |
-| `HOSTNAME` | Pyroscope 标签里的主机名                                          | `new-api` |
+| `HOSTNAME` | Pyroscope 标签里的主机名 | `new-api` |
+| `VM_AGENT_SOCKET` | 定制宿主机 VM Agent 的 Unix Socket 路径（容器内默认 `/run/vm-agent/agent.sock`） | `/run/vm-agent/agent.sock` |
 
 📖 **完整配置：** [环境变量文档](https://docs.newapi.pro/zh/docs/installation/config-maintenance/environment-variables)
 

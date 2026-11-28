@@ -44,6 +44,7 @@
 </p>
 
 <p align="center">
+  <a href="#-fonctionnalités-personnalisées">Fonctionnalités personnalisées</a> •
   <a href="#-démarrage-rapide">Démarrage rapide</a> •
   <a href="#-fonctionnalités-clés">Fonctionnalités clés</a> •
   <a href="#-déploiement">Déploiement</a> •
@@ -60,6 +61,20 @@
 > - Les utilisateurs doivent obtenir légalement les clés API, comptes, services de modèles et autorisations d'interface en amont, et doivent respecter les conditions d'utilisation en amont et les lois et réglementations applicables.
 > - Les utilisateurs doivent s'assurer que leur utilisation est conforme aux conditions d'utilisation en amont et aux lois et réglementations applicables.
 > - Lors de la fourniture de services d'IA générative au public, les utilisateurs doivent se conformer aux exigences réglementaires applicables et remplir toutes les obligations d'enregistrement, de licence, de sécurité du contenu, de vérification d'identité, de conservation des journaux, de fiscalité et d'autorisation en amont requises par leur juridiction.
+
+---
+
+## 🌟 Fonctionnalités personnalisées
+
+Construit sur l'architecture de [New API](https://github.com/QuantumNous/new-api), cette distribution personnalisée ajoute des capacités DevOps, de télémétrie matérielle et de laboratoire interactif (voir aussi [English README](./README.md) et [简体中文](./README.zh_CN.md)) :
+
+- **🧪 Dragon Lab (`/` par défaut)** : établi topologique plein écran à 5 nœuds (`PC d'exploitation`, `SW1`, `SW2`, `iBMC`, `TaiShan OS`), bascule multi-nœuds OS, consoles Guacamole et port série COM1, établi de scripts isolé (`TaiSha.html` + pont `dragon-lab-workbench-bridge.js` + flux terminal en direct), réinitialisation d'usine et permissions déléguées `dragon_lab.full` / `dragon_lab.desktop` ([documentation](./docs/dragon-lab.md)).
+- **🥊 Arène multi-modèles** : comparaison en streaming parallèle de 2 à 4 modèles dans le Playground, regroupement par fournisseur, pièces jointes multimodales, aperçu d'images générées et interrupteur Web Search.
+- **📊 Télémétrie hôte & capteurs thermiques** : CPU/RAM/charge en temps réel, scan multi-disques (`/` et `/mnt/data`) et capteurs `/sys/class/hwmon` / `/sys/class/thermal` dédupliqués.
+- **🔐 Passerelle Nginx unifiée & SSO** : reverse proxy unifié (`gateway/nginx.conf`) pour `/grok2api/`, `/chat2api/` (`/gpt2api`), journaux Dozzle `/logs`, terminaux SSH `/terminal/` et `/kindle-terminal/`, ainsi que `/guacamole/` protégé par `/_remote_desktop_auth` et `/api/user/auth/lab-console-sso`.
+- **🖥️ Espaces distants, cycle de vie VM & Virtual iBMC** : agent hôte `tools/vm-agent` (`new-api-vboxsvc.service`), gestion VirtualBox (démarrage, arrêt ACPI, sauvegarde d'inactivité `idle_save_minutes`, console basique, exclusion mutuelle `win11`/`feiniu`, garde réseau [Network Guard](./tools/vm-agent/NETWORK-GUARD.md)), accès rapides Debian/openEuler/commutateurs eNSP et simulateur **Virtual iBMC** sur `openEuler` ([doc iBMC](./docs/ibmc-simulator.md)).
+- **📡 Moniteur ONT, caméra hôte & Kindle** : supervision chiffrée AES-GCM des routeurs HG8145V5 ([doc ONT](./docs/ont-monitor.md)), flux caméra/micro hôte MSE (`tools/host-camera`), et aperçu d'écran / terminal SSH Kindle (`scripts/kindle-screen`).
+- **🛠️ Automatisation, nettoyage des builds & CI/CD** : bannière d'expiration des tokens et extraction Session JSON, gestionnaire `chat2api-manager`, conteneur Ollama, sonde multi-canaux (`scripts/channel-monitor`), service systemd de nettoyage périodique des builds (`tools/build-cleanup/new-api-build-cleanup.timer`) et publication GHCR versionnée (`.github/workflows/dragon-release.yml`).
 
 ---
 
@@ -151,7 +166,7 @@ docker run --name new-api -d --restart always \
 
 ---
 
-🎉 Après le déploiement, visitez `http://localhost:3000` pour commencer à utiliser!
+🎉 Après le déploiement, visitez `http://localhost:3000` pour l'espace Dragon Lab (`/`), ou `/dashboard` pour la console de gestion New API !
 
 > [!WARNING]
 > Lorsque vous exploitez ce projet en tant que service public d'IA générative ou service de revente d'API, les utilisateurs doivent d'abord remplir toutes les obligations requises en matière d'enregistrement, de licence, de sécurité du contenu, de vérification d'identité, de conservation des journaux, de fiscalité, de paiement et d'autorisation en amont.
@@ -189,7 +204,7 @@ docker run --name new-api -d --restart always \
 | Fonctionnalité | Description |
 |------|------|
 | 🎨 Nouvelle interface utilisateur | Conception d'interface utilisateur moderne |
-| 🌍 Multilingue | Prend en charge le chinois simplifié, le chinois traditionnel, l'anglais, le français et le japonais |
+| 🌍 Multilingue | Prend en charge le chinois simplifié, le chinois traditionnel, l'anglais, le français, le japonais, le russe et le vietnamien (7 langues) |
 | 🔄 Compatibilité des données | Complètement compatible avec la base de données originale de One API |
 | 📈 Tableau de bord des données | Console visuelle et analyse statistique |
 | 🔒 Gestion des permissions | Regroupement de jetons, restrictions de modèles, gestion des utilisateurs |
@@ -338,6 +353,7 @@ docker run --name new-api -d --restart always \
 | `PYROSCOPE_MUTEX_RATE` | Taux d'échantillonnage mutex Pyroscope | `5` |
 | `PYROSCOPE_BLOCK_RATE` | Taux d'échantillonnage block Pyroscope | `5` |
 | `HOSTNAME` | Nom d'hôte tagué pour Pyroscope | `new-api` |
+| `VM_AGENT_SOCKET` | Chemin du socket Unix de l'agent VM hôte personnalisé (`/run/vm-agent/agent.sock` dans le conteneur) | `/run/vm-agent/agent.sock` |
 
 📖 **Configuration complète:** [Documentation des variables d'environnement](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
 
